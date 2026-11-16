@@ -425,7 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleTablesUpdated = (updatedTables: TableOrder[]) => {
       isIncomingSocketUpdate.current = true;
       setTables(updatedTables);
-      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
     const handleOrderCreated = (newOrder: Order) => {
@@ -434,25 +434,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (prev.some(o => o.id === newOrder.id)) return prev;
         return [newOrder, ...prev];
       });
-      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
     const handleIngredientsUpdated = (updatedIngs: Ingredient[]) => {
       isIncomingSocketUpdate.current = true;
       setIngredients(updatedIngs);
-      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
     const handleMenuUpdated = (updatedMenu: MenuConfig) => {
       isIncomingSocketUpdate.current = true;
       setMenuConfig(updatedMenu);
-      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
     const handleCompanyUpdated = (updatedConfig: CompanyConfig) => {
       isIncomingSocketUpdate.current = true;
       setCompanyConfig(updatedConfig);
-      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
     socket.on('tables:updated', handleTablesUpdated);

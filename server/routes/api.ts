@@ -185,6 +185,8 @@ export function createApiRouter(io: Server) {
   router.post('/tables', (req, res) => {
     try {
       const tables = req.body as any[];
+      const senderSocketId = req.headers['x-socket-id'] as string | undefined;
+
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO active_tables 
         (table_id, table_name, status, order_id, total, customer_name, enable_disposables, manual_disposables, items, sent_to_kitchen_at, updated_at)
@@ -209,8 +211,14 @@ export function createApiRouter(io: Server) {
       });
 
       tx();
-      // Notificar a todos los dispositivos conectados mediante WebSockets
-      io.emit('tables:updated', tables);
+
+      // Emitir solo a los DEMÁS dispositivos si conocemos al remitente; si no, a todos
+      if (senderSocketId && io.sockets.sockets.has(senderSocketId)) {
+        io.sockets.sockets.get(senderSocketId)?.broadcast.emit('tables:updated', tables);
+      } else {
+        io.emit('tables:updated', tables);
+      }
+
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

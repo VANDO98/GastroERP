@@ -45,7 +45,10 @@ export async function saveIngredients(ingredients: any[]) {
 export async function saveTables(tables: any[]) {
   return fetch(`${API_URL}/tables`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-socket-id': socket.id || ''
+    },
     body: JSON.stringify(tables)
   });
 }
@@ -81,3 +84,4 @@ export async function saveWaste(waste: any) {
     body: JSON.stringify(waste)
   });
 }
+
