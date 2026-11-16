@@ -116,7 +116,21 @@ export const ToppingsMasterModule: React.FC = () => {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !ingredientId) return;
+    if (!name.trim()) {
+      alert('Por favor ingrese un nombre para el topping.');
+      return;
+    }
+
+    if (!ingredientId) {
+      alert('Error: Todo topping DEBE estar estrictamente vinculado a un insumo o subreceta de almacén para controlar stock.');
+      return;
+    }
+
+    const linkedExists = ingredients.some(i => i.id === ingredientId);
+    if (!linkedExists) {
+      alert('Error: El insumo seleccionado no existe en el inventario de almacén.');
+      return;
+    }
 
     const qty = parseFloat(portionQuantity) || 0.010;
     const priceDelta = parseFloat(defaultPriceDelta) || 0;

@@ -24,7 +24,7 @@ function AppContent() {
   const isLight = themeMode === 'light';
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans select-none antialiased transition-colors pb-14 sm:pb-0 ${isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'}`}>
+    <div className={`min-h-screen flex flex-col font-sans select-none antialiased transition-colors pb-14 sm:pb-0 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
       {/* Barra superior de navegación y métricas */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 

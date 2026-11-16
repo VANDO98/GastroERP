@@ -579,20 +579,22 @@ export const ProductionWasteModule: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Lote Generado</label>
-                <div className="font-mono text-[11px] font-bold text-slate-400 bg-slate-950/60 p-1.5 rounded-xl border border-slate-800 truncate">
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Lote Generado</label>
+                <div className={`font-mono text-[11px] font-bold p-1.5 rounded-xl border truncate ${
+                  isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-950/60 text-slate-400 border-slate-800'
+                }`}>
                   {nextBatchNumber}
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Responsable</label>
+                <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>Responsable</label>
                 <input
                   type="text"
                   value={opResponsible}
                   onChange={e => setOpResponsible(e.target.value)}
                   className={`w-full p-1.5 rounded-xl border text-xs font-bold ${
-                    isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-700 text-white'
+                    isLight ? 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white' : 'bg-slate-950 border-slate-700 text-white'
                   }`}
                   placeholder="Operario a cargo..."
                 />
@@ -808,49 +810,51 @@ export const ProductionWasteModule: React.FC = () => {
 
               {/* CAJA INFERIOR: INSUMOS QUE NECESITAS (EXPLOSIÓN BOM) */}
               <div className={`p-4 rounded-3xl border flex flex-col justify-between ${
-                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-900/80 border-slate-800'
+                isLight ? 'bg-white border-slate-200/80 shadow-sm' : 'bg-slate-900/80 border-slate-800'
               }`}>
                 <div>
-                  <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-black flex items-center gap-2 text-slate-900 dark:text-white">
                       <span className="w-2.5 h-2.5 rounded-full bg-cyan-500"></span>
                       <span>Insumos que necesitas</span>
+                      <span className="text-[11px] font-normal text-slate-400">({explodedRequiredIngredients.length} insumos requeridos)</span>
                     </h3>
-                    <span className="text-xs font-mono font-black text-emerald-500">
+                    <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
                       Total Costo: S/ {totalExplodedCost.toFixed(2)}
                     </span>
                   </div>
 
-                  <div className="overflow-x-auto max-h-56">
-                    <table className="w-full text-left text-xs">
-                      <thead>
-                        <tr className={`border-b ${isLight ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'}`}>
-                          <th className="pb-1.5 font-bold">INSUMO</th>
-                          <th className="pb-1.5 text-center font-bold">CANT. TEÓRICA (BOM)</th>
-                          <th className="pb-1.5 text-center font-bold text-cyan-400">CANT. REAL RETIRADA</th>
-                          <th className="pb-1.5 text-center font-bold text-amber-400">MERMA REPORTADA</th>
-                          <th className="pb-1.5 text-center font-bold">% MERMA REAL</th>
-                          <th className="pb-1.5 text-center font-bold text-orange-400">TOTAL A DESCONTAR</th>
-                          <th className="pb-1.5 text-center font-bold">STOCK ALMACÉN</th>
-                          <th className="pb-1.5 text-right font-bold">VALORIZACIÓN S/</th>
+                  {/* Vista Desktop / Tablet: Tabla responsiva con scroll horizontal contenido y scroll vertical */}
+                  <div className="hidden sm:block overflow-x-auto max-h-72 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-inner">
+                    <table className="w-full text-left text-xs min-w-[700px]">
+                      <thead className={`sticky top-0 z-10 ${isLight ? 'bg-slate-100/95 text-slate-600' : 'bg-slate-950/95 text-slate-400'} backdrop-blur-sm`}>
+                        <tr className="border-b border-slate-200 dark:border-slate-800">
+                          <th className="py-2.5 px-3 font-bold">INSUMO</th>
+                          <th className="py-2.5 px-2 text-center font-bold">CANT. TEÓRICA (BOM)</th>
+                          <th className="py-2.5 px-2 text-center font-bold text-cyan-600 dark:text-cyan-400">CANT. REAL RETIRADA</th>
+                          <th className="py-2.5 px-2 text-center font-bold text-amber-600 dark:text-amber-400">MERMA REPORTADA</th>
+                          <th className="py-2.5 px-2 text-center font-bold">% MERMA REAL</th>
+                          <th className="py-2.5 px-2 text-center font-bold text-orange-600 dark:text-orange-400">TOTAL A DESCONTAR</th>
+                          <th className="py-2.5 px-2 text-center font-bold">STOCK ALMACÉN</th>
+                          <th className="py-2.5 px-3 text-right font-bold">VALORIZACIÓN S/</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/40">
+                      <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40">
                         {explodedRequiredIngredients.map((item, idx) => {
                           const realQty = item.quantityReal ?? item.quantityRequired;
                           const hasStock = item.currentStock >= realQty;
 
                           return (
-                            <tr key={idx} className="hover:bg-slate-800/20">
-                              <td className="py-2 pr-2">
-                                <span className="font-bold text-slate-800 dark:text-slate-200 block truncate">{item.ingredientName}</span>
-                                <span className="text-[9px] font-mono text-slate-400">{item.ingredientCode}</span>
+                            <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/30'}>
+                              <td className="py-2 px-3">
+                                <span className="font-bold text-slate-900 dark:text-slate-100 block truncate">{item.ingredientName}</span>
+                                <span className="text-[10px] font-mono text-slate-400">{item.ingredientCode}</span>
                               </td>
-                              <td className="py-2 text-center font-mono font-semibold text-slate-400">
+                              <td className="py-2 px-2 text-center font-mono font-semibold text-slate-600 dark:text-slate-400">
                                 {item.quantityRequired.toFixed(3)} {item.unit}
                               </td>
                               {/* Cantidad Real Retirada del Almacén */}
-                              <td className="py-2 text-center">
+                              <td className="py-2 px-2 text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   <input
                                     type="number"
@@ -864,15 +868,15 @@ export const ProductionWasteModule: React.FC = () => {
                                         [item.ingredientId]: val
                                       }));
                                     }}
-                                    className={`w-18 p-1 text-center font-mono font-black rounded-lg border text-xs ${
-                                      isLight ? 'bg-cyan-50 border-cyan-300 text-cyan-900' : 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300'
+                                    className={`w-20 p-1 text-center font-mono font-black rounded-lg border text-xs ${
+                                      isLight ? 'bg-cyan-50 border-cyan-300 text-cyan-900 focus:bg-white' : 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300'
                                     }`}
                                   />
                                   <span className="text-[10px] text-slate-400 font-mono">{item.unit}</span>
                                 </div>
                               </td>
                               {/* Merma Reportada */}
-                              <td className="py-2 text-center">
+                              <td className="py-2 px-2 text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   <input
                                     type="number"
@@ -887,9 +891,9 @@ export const ProductionWasteModule: React.FC = () => {
                                         [item.ingredientId]: val
                                       }));
                                     }}
-                                    className={`w-16 p-1 text-center font-mono font-bold rounded-lg border text-xs ${
+                                    className={`w-18 p-1 text-center font-mono font-bold rounded-lg border text-xs ${
                                       (ingredientWasteInput[item.ingredientId] || 0) > 0
-                                        ? 'bg-amber-500/15 border-amber-500/50 text-amber-300'
+                                        ? 'bg-amber-500/15 border-amber-500/50 text-amber-500 font-black'
                                         : isLight ? 'bg-slate-50 border-slate-300 text-slate-700' : 'bg-slate-950 border-slate-700 text-slate-300'
                                     }`}
                                   />
@@ -897,31 +901,33 @@ export const ProductionWasteModule: React.FC = () => {
                                 </div>
                               </td>
                               {/* % Merma Real */}
-                              <td className="py-2 text-center">
+                              <td className="py-2 px-2 text-center">
                                 <span className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-black ${
                                   item.wastePercent > 10
-                                    ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                                    ? 'bg-rose-500/20 text-rose-500 border border-rose-500/30'
                                     : item.wastePercent > 0
-                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                    : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
                                 }`}>
                                   {item.wastePercent.toFixed(2)}%
                                 </span>
                               </td>
                               {/* Total a Descontar (= Cantidad Real) */}
-                              <td className="py-2 text-center font-mono font-black text-orange-400">
+                              <td className="py-2 px-2 text-center font-mono font-black text-orange-600 dark:text-orange-400">
                                 {realQty.toFixed(3)} {item.unit}
                               </td>
                               {/* Stock en Almacén */}
-                              <td className="py-2 text-center font-mono">
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                                  hasStock ? 'text-emerald-400 bg-emerald-500/10' : 'text-rose-400 bg-rose-500/20 font-bold'
+                              <td className="py-2 px-2 text-center font-mono">
+                                <span className={`px-2 py-0.5 rounded-lg text-[10px] font-black ${
+                                  hasStock 
+                                    ? isLight ? 'text-emerald-700 bg-emerald-100 border border-emerald-200' : 'text-emerald-400 bg-emerald-500/10'
+                                    : 'text-rose-500 bg-rose-500/15 font-bold border border-rose-500/30'
                                 }`}>
                                   {item.currentStock} {item.unit}
                                 </span>
                               </td>
                               {/* Valorización Soles */}
-                              <td className="py-2 text-right font-mono font-black text-slate-900 dark:text-white">
+                              <td className="py-2 px-3 text-right font-mono font-black text-slate-900 dark:text-white">
                                 S/ {item.totalCost.toFixed(2)}
                               </td>
                             </tr>
@@ -929,6 +935,82 @@ export const ProductionWasteModule: React.FC = () => {
                         })}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Vista Móvil: Tarjetas individuales en lugar de tabla horizontal apretada */}
+                  <div className="sm:hidden space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    {explodedRequiredIngredients.map((item, idx) => {
+                      const realQty = item.quantityReal ?? item.quantityRequired;
+                      const hasStock = item.currentStock >= realQty;
+
+                      return (
+                        <div key={idx} className={`p-3 rounded-2xl border text-xs space-y-2 ${
+                          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+                        }`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className="font-bold text-slate-900 dark:text-white block">{item.ingredientName}</span>
+                              <span className="text-[10px] font-mono text-slate-400">{item.ingredientCode} • Teórico: {item.quantityRequired.toFixed(3)} {item.unit}</span>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold ${
+                              hasStock ? 'text-emerald-600 bg-emerald-500/10' : 'text-rose-500 bg-rose-500/15'
+                            }`}>
+                              Stock: {item.currentStock} {item.unit}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200 dark:border-slate-800/80">
+                            <div>
+                              <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 block mb-0.5">Cant. Real Retirada:</span>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  value={ingredientRealInput[item.ingredientId] !== undefined ? ingredientRealInput[item.ingredientId] : item.quantityRequired}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setIngredientRealInput(prev => ({ ...prev, [item.ingredientId]: val }));
+                                  }}
+                                  className={`w-full p-1.5 text-center font-mono font-black rounded-lg border text-xs ${
+                                    isLight ? 'bg-white border-cyan-300 text-cyan-900' : 'bg-cyan-950/40 border-cyan-500/50 text-cyan-300'
+                                  }`}
+                                />
+                                <span className="text-[10px] text-slate-400">{item.unit}</span>
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 block mb-0.5">Merma Reportada:</span>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  placeholder="0.000"
+                                  value={ingredientWasteInput[item.ingredientId] !== undefined ? ingredientWasteInput[item.ingredientId] : ''}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setIngredientWasteInput(prev => ({ ...prev, [item.ingredientId]: val }));
+                                  }}
+                                  className={`w-full p-1.5 text-center font-mono font-bold rounded-lg border text-xs ${
+                                    (ingredientWasteInput[item.ingredientId] || 0) > 0
+                                      ? 'bg-amber-500/15 border-amber-500/50 text-amber-500 font-black'
+                                      : isLight ? 'bg-white border-slate-300 text-slate-700' : 'bg-slate-950 border-slate-700 text-slate-300'
+                                  }`}
+                                />
+                                <span className="text-[10px] text-slate-400">{item.unit}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-800/80 text-[11px]">
+                            <span className="text-slate-500">Descuento: <b className="text-orange-500 font-mono">{realQty.toFixed(3)} {item.unit}</b></span>
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">Costo: S/ {item.totalCost.toFixed(2)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 

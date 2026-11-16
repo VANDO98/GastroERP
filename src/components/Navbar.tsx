@@ -289,14 +289,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             </div>
             <div className="hidden md:block">
               <div className="flex items-center gap-1.5 leading-tight">
-                <h1 className="font-black text-sm tracking-tight text-white dark:text-white">
+                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-white">
                   {companyConfig?.tradeName || 'Sabor & Fruta'}
                 </h1>
-                <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                   Carabayllo
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
                 RUC {companyConfig?.ruc || '20608945123'}
               </p>
             </div>
@@ -408,22 +408,26 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
           </button>
 
           {/* KPIs de Hoy */}
-          <div className="hidden xl:flex items-center gap-3 bg-slate-900/60 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+          <div className={`hidden xl:flex items-center gap-3 border px-3 py-1.5 rounded-xl text-xs ${
+            isLight
+              ? 'bg-slate-100/90 border-slate-200 text-slate-700'
+              : 'bg-slate-900/60 border-slate-800 text-slate-300'
+          }`}>
             <div className="flex items-center gap-1">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-slate-400">Tickets:</span>
-              <span className="font-bold text-white font-mono">{ordersCountToday}</span>
+              <Zap className="w-3.5 h-3.5 text-amber-500" />
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Tickets:</span>
+              <span className={`font-bold font-mono ${isLight ? 'text-slate-900' : 'text-white'}`}>{ordersCountToday}</span>
             </div>
-            <div className="w-px h-3 bg-slate-800"></div>
+            <div className={`w-px h-3 ${isLight ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
             <div className="flex items-center gap-1">
-              <span className="text-slate-400">Ventas:</span>
-              <span className="font-bold text-emerald-400 font-mono">S/ {totalSalesToday.toFixed(2)}</span>
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>Ventas:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">S/ {totalSalesToday.toFixed(2)}</span>
             </div>
-            <div className="w-px h-3 bg-slate-800"></div>
+            <div className={`w-px h-3 ${isLight ? 'bg-slate-300' : 'bg-slate-800'}`}></div>
             <div className="flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="text-slate-400">FC:</span>
-              <span className="font-bold text-emerald-400 font-mono">{averageFoodCostToday}%</span>
+              <TrendingUp className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>FC:</span>
+              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">{averageFoodCostToday}%</span>
             </div>
           </div>
         </div>
