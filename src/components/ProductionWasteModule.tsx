@@ -81,6 +81,7 @@ export const ProductionWasteModule: React.FC = () => {
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [ingredientWasteInput, setIngredientWasteInput] = useState<Record<string, number>>({});
   const [ingredientRealInput, setIngredientRealInput] = useState<Record<string, number>>({});
+  const [viewingRecipeDetail, setViewingRecipeDetail] = useState<FormRecipeItem | null>(null);
 
   const showNotice = (msg: string) => {
     setNotificationMsg(msg);
@@ -685,6 +686,7 @@ export const ProductionWasteModule: React.FC = () => {
                       <tr className={`border-b ${isLight ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'}`}>
                         <th className="pb-2 font-mono text-[10px]">CÓDIGO</th>
                         <th className="pb-2 font-bold">RECETA</th>
+                        <th className="pb-2 text-center font-bold">BOM</th>
                         <th className="pb-2 text-center font-bold">CANT. ESTIMADA</th>
                         <th className="pb-2 text-center font-bold">CANT. RESULTANTE</th>
                         <th className="pb-2 text-center font-bold">UNIDAD</th>
@@ -694,18 +696,32 @@ export const ProductionWasteModule: React.FC = () => {
                     <tbody className="divide-y divide-slate-800/40">
                       {selectedRecipes.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="py-8 text-center text-slate-500 text-xs">
+                          <td colSpan={7} className="py-8 text-center text-slate-500 text-xs">
                             No has agregado recetas a preparar aún. Usa el buscador superior.
                           </td>
                         </tr>
                       ) : (
                         selectedRecipes.map((rec, idx) => (
-                          <tr key={idx} className="hover:bg-slate-800/20">
-                            <td className="py-2.5 font-mono text-orange-400 font-bold whitespace-nowrap">
+                          <tr key={idx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/20'}>
+                            <td className="py-2.5 font-mono text-orange-600 dark:text-orange-400 font-bold whitespace-nowrap">
                               {rec.recipeCode}
                             </td>
                             <td className="py-2.5 font-bold text-slate-900 dark:text-white pr-2">
                               {rec.recipeName}
+                            </td>
+                            <td className="py-2.5 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setViewingRecipeDetail(rec)}
+                                title="Ver composición y fórmula BOM de esta receta"
+                                className={`p-1.5 rounded-lg border transition-all inline-flex items-center justify-center ${
+                                  isLight
+                                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-300 hover:border-amber-400 shadow-sm'
+                                    : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+                                }`}
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
                             </td>
                             <td className="py-2.5 text-center">
                               <input
@@ -731,7 +747,7 @@ export const ProductionWasteModule: React.FC = () => {
                                 }`}
                               />
                             </td>
-                            <td className="py-2.5 text-center font-mono text-[11px] text-slate-400">
+                            <td className="py-2.5 text-center font-mono text-[11px] text-slate-500 dark:text-slate-400">
                               {rec.unit}
                             </td>
                             <td className="py-2.5 text-right">
@@ -1527,6 +1543,142 @@ export const ProductionWasteModule: React.FC = () => {
                     S/ {viewingOpDetail.totalActualCost.toFixed(2)}
                   </span>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL VISTA RÁPIDA: COMPOSICIÓN INDIVIDUAL DE RECETA (OJITO BOM) */}
+      {/* ========================================================================= */}
+      {viewingRecipeDetail && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`w-full max-w-lg rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in fade-in duration-200 ${
+            isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-800 text-slate-100'
+          }`}>
+            {/* Header del Modal */}
+            <div className={`p-4 border-b flex items-center justify-between ${
+              isLight ? 'bg-amber-50/80 border-slate-200' : 'bg-slate-950/80 border-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500">
+                  <Eye className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase font-mono font-bold text-amber-500 block">
+                    Ficha Técnica de Composición (BOM)
+                  </span>
+                  <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                    <span className="font-mono text-orange-500">{viewingRecipeDetail.recipeCode}</span>
+                    <span>{viewingRecipeDetail.recipeName}</span>
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingRecipeDetail(null)}
+                className={`p-1.5 rounded-xl border transition-all ${
+                  isLight ? 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200' : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                }`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Metadatos de la orden de producción actual para esta receta */}
+            <div className={`px-4 py-2.5 border-b grid grid-cols-3 gap-2 text-xs ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800'
+            }`}>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Cant. a Producir:</span>
+                <span className="font-mono font-black text-emerald-600 dark:text-emerald-400">
+                  {viewingRecipeDetail.resultQuantity || viewingRecipeDetail.estimatedQuantity} {viewingRecipeDetail.unit}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Presentación Base:</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                  1.00 {viewingRecipeDetail.unit}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Líneas de Insumos:</span>
+                <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+                  {viewingRecipeDetail.bom.length} componentes
+                </span>
+              </div>
+            </div>
+
+            {/* Tabla de Insumos requeridos por receta individual */}
+            <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className={`border-b ${isLight ? 'border-slate-200 text-slate-500' : 'border-slate-800 text-slate-400'}`}>
+                    <th className="pb-2 font-bold">INSUMO COMPONENTE</th>
+                    <th className="pb-2 text-center font-bold">DOSIS UNITARIA (1 {viewingRecipeDetail.unit})</th>
+                    <th className="pb-2 text-center font-bold text-orange-600 dark:text-orange-400">TOTAL ESTA OP</th>
+                    <th className="pb-2 text-right font-bold">COSTO S/</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800/40">
+                  {viewingRecipeDetail.bom.map((bomItem, bIdx) => {
+                    const ing = ingredients.find(i => i.id === bomItem.ingredientId);
+                    const qtyMultiplier = viewingRecipeDetail.resultQuantity || viewingRecipeDetail.estimatedQuantity || 1;
+                    const totalQty = bomItem.quantity * qtyMultiplier;
+                    const unitCost = ing?.costPerUnit || 0;
+                    const totalCost = totalQty * unitCost;
+
+                    return (
+                      <tr key={bIdx} className={isLight ? 'hover:bg-slate-50' : 'hover:bg-slate-800/20'}>
+                        <td className="py-2.5 pr-2">
+                          <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                            {ing ? ing.name : bomItem.ingredientId}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {ing ? ing.code : ''} • Stock: {ing ? `${ing.stock} ${ing.unit}` : '-'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 text-center font-mono text-slate-600 dark:text-slate-300">
+                          {bomItem.quantity.toFixed(3)} {bomItem.unit}
+                        </td>
+                        <td className="py-2.5 text-center font-mono font-black text-orange-600 dark:text-orange-400">
+                          {totalQty.toFixed(3)} {bomItem.unit}
+                        </td>
+                        <td className="py-2.5 text-right font-mono font-black text-slate-900 dark:text-white">
+                          S/ {totalCost.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {viewingRecipeDetail.bom.length === 0 && (
+                <div className="py-6 text-center text-slate-400 text-xs italic">
+                  Esta receta no tiene insumos vinculados en su fórmula BOM.
+                </div>
+              )}
+            </div>
+
+            {/* Footer con Costo Total individual */}
+            <div className={`p-4 border-t flex items-center justify-between ${
+              isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950 border-slate-800'
+            }`}>
+              <div>
+                <span className="text-[10px] text-slate-400 uppercase font-bold block">Costo Estimado de esta receta</span>
+                <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">
+                  {viewingRecipeDetail.resultQuantity} {viewingRecipeDetail.unit} preparados
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-mono font-black text-emerald-600 dark:text-emerald-400">
+                  S/ {viewingRecipeDetail.bom.reduce((acc, b) => {
+                    const ing = ingredients.find(i => i.id === b.ingredientId);
+                    const qtyMultiplier = viewingRecipeDetail.resultQuantity || viewingRecipeDetail.estimatedQuantity || 1;
+                    return acc + (b.quantity * qtyMultiplier * (ing?.costPerUnit || 0));
+                  }, 0).toFixed(2)}
+                </span>
               </div>
             </div>
           </div>
