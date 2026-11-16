@@ -458,9 +458,9 @@ export const PosModule: React.FC = () => {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-3 sm:p-4">
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4">
             {selectedLineId === 'combos' ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                 {combos.filter(c => c.isActive).length === 0 ? (
                   <div className="col-span-full text-center py-10 text-slate-500 text-xs">
                     No hay combos activos en este momento.
@@ -469,98 +469,88 @@ export const PosModule: React.FC = () => {
                   combos.filter(c => c.isActive).map(combo => {
                     const comboAlert = getComboStockAlert(combo);
                     return (
-                    <div
+                    <button
                       key={combo.id}
+                      type="button"
                       onClick={() => addComboToActiveTable(combo)}
-                      className={'group relative rounded-3xl p-4 border transition-all cursor-pointer flex flex-col justify-between shadow-sm active:scale-95 select-none ' +
-                        (comboAlert.isLow ? 'ring-2 ring-amber-400/80 border-amber-400 ' : '') +
-                        (isLight ? 'bg-white border-amber-300 hover:border-amber-500 shadow-md text-slate-900' : 'bg-slate-900/90 border-amber-500/30 hover:border-amber-500/60 text-slate-100')}
+                      className={`h-24 sm:h-28 rounded-2xl p-2.5 border transition-all text-left flex flex-col justify-between shadow-sm active:scale-95 select-none ${
+                        comboAlert.isLow ? 'ring-2 ring-amber-400 border-amber-400 ' : ''
+                      } ${
+                        isLight
+                          ? 'bg-amber-50 hover:bg-amber-100/70 border-amber-300 text-slate-900'
+                          : 'bg-amber-950/30 hover:bg-amber-900/40 border-amber-500/40 text-amber-100'
+                      }`}
                     >
-                      <div>
-                        <div className="flex items-start justify-between gap-1">
-                          <span className="text-[10px] font-mono uppercase font-black px-2 py-0.5 rounded bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                            {combo.sku}
-                          </span>
-                          <span className="font-mono text-base font-black text-emerald-600">S/ {combo.price.toFixed(2)}</span>
-                        </div>
-                        <h3 className={'text-sm font-black mt-2 leading-snug ' + (isLight ? 'text-slate-900' : 'text-white')}>{combo.name}</h3>
-                        {combo.description && <p className={'text-[11px] mt-1 line-clamp-2 ' + (isLight ? 'text-slate-600' : 'text-slate-400')}>{combo.description}</p>}
-
-                        {comboAlert.isLow && (
-                          <div className="mt-2 px-2 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1.5">
-                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
-                            <span className="line-clamp-1">Kárdex bajo: {comboAlert.missingDetails[0]} (Verificar con barra)</span>
-                          </div>
-                        )}
-
-                        <div className={'mt-2.5 p-2 rounded-xl text-xs space-y-1 ' + (isLight ? 'bg-slate-50 border border-slate-200' : 'bg-slate-950/60 border border-slate-800')}>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase">Incluye:</span>
-                          {combo.items.map((it, idx) => (
-                            <div key={idx} className="flex items-center gap-1.5 font-semibold text-[11px]">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                              <span>{it.quantity}x {it.name}</span>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="flex-1 overflow-hidden w-full">
+                        <span className="text-[9px] font-mono font-black uppercase text-amber-500 block truncate">
+                          {combo.sku}
+                        </span>
+                        <h3 className="text-xs sm:text-sm font-black leading-tight line-clamp-2 mt-0.5">
+                          {combo.shortName || combo.name}
+                        </h3>
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-                        <span className="text-[10px] font-black text-amber-500 uppercase">Pack Promocional</span>
-                        <button
-                          onClick={e => {
-                            e.stopPropagation();
-                            addComboToActiveTable(combo);
-                          }}
-                          className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 shadow-md shadow-amber-500/30 active:scale-90 transition-transform"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Añadir</span>
-                        </button>
+                      <div className="flex items-center justify-between pt-1 border-t border-amber-500/20 w-full">
+                        <span className="font-mono text-xs sm:text-sm font-black text-amber-500">
+                          S/ {combo.price.toFixed(2)}
+                        </span>
+                        <span className="w-5 h-5 rounded-full bg-amber-500 text-slate-950 text-xs font-black flex items-center justify-center">
+                          +
+                        </span>
                       </div>
-                    </div>
-                  );
-                })
+                    </button>
+                    );
+                  })
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                 {displayedProducts.map(product => {
                   const hasModifiers = product.quickModifiers && product.quickModifiers.length > 0;
                   const stockAlert = getProductStockAlert(product);
+                  const isDrink = selectedLineId === 'linea-fria';
+
                   return (
-                    <div
+                    <button
                       key={product.id}
+                      type="button"
                       onClick={() => hasModifiers ? handleOpenModifiers(product) : addItemToActiveTable(product, [])}
-                      className={'group relative rounded-3xl p-3.5 border transition-all cursor-pointer flex flex-col justify-between shadow-sm active:scale-95 select-none ' +
-                        (stockAlert.isLow ? 'ring-2 ring-amber-400/80 border-amber-400 ' : '') +
-                        (isLight ? 'bg-white border-slate-300 hover:border-orange-500 shadow-md text-slate-900' : 'bg-slate-900/90 border-slate-800 hover:border-orange-500/60 text-slate-100')}
+                      className={`h-24 sm:h-28 rounded-2xl p-2.5 border transition-all text-left flex flex-col justify-between shadow-sm active:scale-95 select-none relative ${
+                        stockAlert.isLow ? 'ring-2 ring-amber-400 border-amber-400 ' : ''
+                      } ${
+                        isLight
+                          ? isDrink
+                            ? 'bg-cyan-50/80 hover:bg-cyan-100/80 border-cyan-200 text-slate-900'
+                            : 'bg-orange-50/80 hover:bg-orange-100/80 border-orange-200 text-slate-900'
+                          : isDrink
+                          ? 'bg-slate-900/90 hover:bg-slate-800 border-cyan-500/30 text-white'
+                          : 'bg-slate-900/90 hover:bg-slate-800 border-orange-500/30 text-white'
+                      }`}
                     >
-                      <div>
-                        <div className="flex items-start justify-between gap-1">
-                          <span className={'text-[10px] font-mono uppercase font-bold ' + (isLight ? 'text-slate-500' : 'text-slate-400')}>{product.sku}</span>
-                          <span className="font-mono text-sm font-black text-emerald-600">S/ {product.price.toFixed(2)}</span>
+                      <div className="flex-1 overflow-hidden w-full">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[9px] font-mono uppercase font-bold text-slate-400 truncate">
+                            {product.sku}
+                          </span>
+                          {hasModifiers && (
+                            <span className="text-[8px] font-bold px-1 rounded bg-orange-500/20 text-orange-400">
+                              OPC
+                            </span>
+                          )}
                         </div>
-                        <h3 className={'text-sm font-black mt-1 leading-snug line-clamp-2 ' + (isLight ? 'text-slate-900' : 'text-white')}>{product.name}</h3>
-                        {product.description && <p className={'text-[11px] mt-1 line-clamp-2 ' + (isLight ? 'text-slate-600' : 'text-slate-400')}>{product.description}</p>}
-
-                        {stockAlert.isLow && (
-                          <div className="mt-2 px-2 py-1 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-[10px] font-bold flex items-center gap-1.5">
-                            <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-500" />
-                            <span className="line-clamp-1">Kárdex bajo: {stockAlert.missingDetails[0]} (Verificar con barra)</span>
-                          </div>
-                        )}
+                        <h3 className="text-xs sm:text-sm font-black leading-tight line-clamp-2 mt-1">
+                          {product.shortName || product.name}
+                        </h3>
                       </div>
 
-                      <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-slate-200 dark:border-slate-800">
-                        {hasModifiers ? <span className="text-[10px] font-bold text-orange-500 bg-orange-500/10 px-2 py-0.5 rounded-full">Personalizar ⚙</span> : <span className="text-[10px] font-bold text-slate-400">Toque directo</span>}
-                        <button
-                          onClick={e => handleFastAdd(product, e)}
-                          className="w-8 h-8 rounded-xl bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center font-bold shadow-md shadow-orange-600/30 active:scale-90 transition-transform"
-                        >
-                          <Plus className="w-4 h-4 stroke-[3]" />
-                        </button>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200 dark:border-slate-800 w-full">
+                        <span className="font-mono text-xs sm:text-sm font-black text-emerald-500">
+                          S/ {product.price.toFixed(2)}
+                        </span>
+                        <div className="w-5 h-5 rounded-full bg-orange-600 hover:bg-orange-500 text-white text-xs font-black flex items-center justify-center shadow">
+                          +
+                        </div>
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

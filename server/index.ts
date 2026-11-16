@@ -28,6 +28,9 @@ const io = new Server(server, {
 initDatabase();
 seedDatabaseIfEmpty();
 
+// Guardar referencia a io para su uso en rutas
+app.set('io', io);
+
 // Montar rutas de la API REST
 app.use('/api', createApiRouter(io));
 
@@ -58,3 +61,4 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`💾 Base de datos SQLite inicializada: data/erp_database.sqlite`);
   console.log(`=======================================================`);
 });
+

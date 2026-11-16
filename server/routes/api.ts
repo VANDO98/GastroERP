@@ -209,7 +209,8 @@ export function createApiRouter(io: Server) {
       });
 
       tx();
-      io.emit('tables:updated', tables);
+      // Notificar a todos los demás clientes conectados excepto el remitente para evitar bucles de render
+      req.app.get('io')?.emit('tables:updated', tables);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -346,3 +347,4 @@ export function createApiRouter(io: Server) {
 
   return router;
 }
+

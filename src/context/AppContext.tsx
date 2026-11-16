@@ -391,12 +391,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : initialProductionOrders;
   });
 
+  // Bandera para evitar retransmitir al servidor lo que acabamos de recibir por WebSocket
+  const isIncomingSocketUpdate = React.useRef(false);
+
   // Sincronización Inicial con Servidor Central (Base de Datos SQLite)
   useEffect(() => {
     let isMounted = true;
     fetchBootstrap()
       .then(data => {
         if (!isMounted || !data) return;
+        isIncomingSocketUpdate.current = true;
         if (data.companyConfig) setCompanyConfig(data.companyConfig);
         if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
         if (data.menuConfig) setMenuConfig(data.menuConfig);
@@ -411,6 +415,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.wastes) setWastes(data.wastes);
         if (data.productionOrders) setProductionOrders(data.productionOrders);
         if (data.customCategories) setCustomIngredientCategories(data.customCategories);
+        setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
       })
       .catch(err => {
         console.warn('[Sync] Servidor offline o no alcanzable, usando respaldo local en memoria/localStorage:', err.message);
@@ -418,26 +423,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Escuchar eventos en vivo emitidos desde otros dispositivos en la red local
     const handleTablesUpdated = (updatedTables: TableOrder[]) => {
+      isIncomingSocketUpdate.current = true;
       setTables(updatedTables);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
     };
 
     const handleOrderCreated = (newOrder: Order) => {
+      isIncomingSocketUpdate.current = true;
       setOrders(prev => {
         if (prev.some(o => o.id === newOrder.id)) return prev;
         return [newOrder, ...prev];
       });
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
     };
 
     const handleIngredientsUpdated = (updatedIngs: Ingredient[]) => {
+      isIncomingSocketUpdate.current = true;
       setIngredients(updatedIngs);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
     };
 
     const handleMenuUpdated = (updatedMenu: MenuConfig) => {
+      isIncomingSocketUpdate.current = true;
       setMenuConfig(updatedMenu);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
     };
 
     const handleCompanyUpdated = (updatedConfig: CompanyConfig) => {
+      isIncomingSocketUpdate.current = true;
       setCompanyConfig(updatedConfig);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
     };
 
     socket.on('tables:updated', handleTablesUpdated);
@@ -489,12 +504,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     localStorage.setItem('erp_ingredients', JSON.stringify(ingredients));
-    saveIngredients(ingredients).catch(() => {});
+    if (!isIncomingSocketUpdate.current) {
+      saveIngredients(ingredients).catch(() => {});
+    }
   }, [ingredients]);
 
   useEffect(() => {
     localStorage.setItem('erp_tables', JSON.stringify(tables));
-    saveTables(tables).catch(() => {});
+    if (!isIncomingSocketUpdate.current) {
+      saveTables(tables).catch(() => {});
+    }
   }, [tables]);
 
   useEffect(() => {
