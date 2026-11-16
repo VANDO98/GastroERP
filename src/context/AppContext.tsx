@@ -8,6 +8,7 @@ import type {
   BatchProduction,
   WasteRecord,
   TableOrder,
+  TableStatus,
   DetailedPurchaseInvoice,
   DetailedPurchaseItem,
   Product,
@@ -471,14 +472,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Sincronizaciones con localStorage y persistencia hacia el Servidor Central
+  // Sincronizaciones locales con localStorage (como respaldo de solo lectura)
   useEffect(() => {
     localStorage.setItem('erp_custom_ingredient_categories', JSON.stringify(customIngredientCategories));
   }, [customIngredientCategories]);
 
   useEffect(() => {
     localStorage.setItem('erp_company_config', JSON.stringify(companyConfig));
-    saveCompanyConfig(companyConfig).catch(() => {});
   }, [companyConfig]);
 
   useEffect(() => {
@@ -499,21 +499,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     localStorage.setItem('erp_menu_config', JSON.stringify(menuConfig));
-    saveMenuConfig(menuConfig).catch(() => {});
   }, [menuConfig]);
 
   useEffect(() => {
     localStorage.setItem('erp_ingredients', JSON.stringify(ingredients));
-    if (!isIncomingSocketUpdate.current) {
-      saveIngredients(ingredients).catch(() => {});
-    }
   }, [ingredients]);
 
   useEffect(() => {
     localStorage.setItem('erp_tables', JSON.stringify(tables));
-    if (!isIncomingSocketUpdate.current) {
-      saveTables(tables).catch(() => {});
-    }
   }, [tables]);
 
   useEffect(() => {
@@ -538,7 +531,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     localStorage.setItem('erp_suppliers', JSON.stringify(suppliers));
-    saveSuppliers(suppliers).catch(() => {});
   }, [suppliers]);
 
   useEffect(() => {
@@ -548,8 +540,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Gestión de Insumos
   const updateIngredientStock = (id: string, delta: number) => {
-    setIngredients(prev =>
-      prev.map(item => {
+    setIngredients(prev => {
+      const next = prev.map(item => {
         if (item.id !== id) return item;
         if (delta < 0) {
           const { updatedIngredient } = deductFifoFromIngredient(item, Math.abs(delta));
@@ -569,12 +561,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lastUpdated: new Date().toISOString()
           };
         }
-      })
-    );
+      });
+      saveIngredients(next).catch(() => {});
+      return next;
+    });
   };
 
   const updateIngredient = (updated: Ingredient) => {
-    setIngredients(prev => prev.map(item => (item.id === updated.id ? updated : item)));
+    setIngredients(prev => {
+      const next = prev.map(item => (item.id === updated.id ? updated : item));
+      saveIngredients(next).catch(() => {});
+      return next;
+    });
   };
 
   const addIngredient = (newIng: Omit<Ingredient, 'id' | 'batches'> & { initialUnitCost?: number }) => {
@@ -593,12 +591,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       batches: newIng.stock > 0 ? [initialBatch] : []
     };
-    setIngredients(prev => [...prev, item]);
+    setIngredients(prev => {
+      const next = [...prev, item];
+      saveIngredients(next).catch(() => {});
+      return next;
+    });
   };
 
   // Recetas
   const updateMenuConfig = (newConfig: MenuConfig) => {
     setMenuConfig(newConfig);
+    saveMenuConfig(newConfig).catch(() => {});
   };
 
   const addNewProductRecipe = (product: Product, lineId: 'linea-fria' | 'linea-caliente', categoryId: string) => {
@@ -615,7 +618,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return line;
       });
-      return { ...prev, lines: updatedLines };
+      const next = { ...prev, lines: updatedLines };
+      saveMenuConfig(next).catch(() => {});
+      return next;
     });
   };
 
@@ -628,7 +633,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           products: cat.products.map(p => (p.id === updatedProduct.id ? updatedProduct : p))
         }))
       }));
-      return { ...prev, lines: updatedLines };
+      const next = { ...prev, lines: updatedLines };
+      saveMenuConfig(next).catch(() => {});
+      return next;
     });
   };
 
@@ -654,7 +661,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return line;
       });
-      return { ...prev, lines: updatedLines };
+      const next = { ...prev, lines: updatedLines };
+      saveMenuConfig(next).catch(() => {});
+      return next;
     });
   };
 
@@ -688,8 +697,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     customerName?: string,
     manualDisposables?: ManualDisposable[]
   ) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const next = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           const currentManuals = manualDisposables !== undefined ? manualDisposables : (tbl.manualDisposables || []);
           const itemsTotal = items.reduce((acc, curr) => acc + curr.itemTotal, 0);
@@ -697,7 +706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const autoDisposablesCharge = computeTableDisposablesCharge(items, enableDisposables);
           const grandTotal = Number((itemsTotal + manualsTotal + autoDisposablesCharge).toFixed(2));
 
-          const newStatus = items.length === 0 && currentManuals.length === 0
+          const newStatus: TableStatus = items.length === 0 && currentManuals.length === 0
             ? 'libre'
             : tbl.status === 'en_preparacion'
             ? 'en_preparacion'
@@ -714,13 +723,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         return tbl;
-      })
-    );
+      });
+      saveTables(next).catch(() => {});
+      return next;
+    });
   };
 
   const addManualDisposableToTable = (tableId: string, manualItem: ManualDisposable) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const next = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           const existingIndex = tbl.manualDisposables.findIndex(m => m.ingredientId === manualItem.ingredientId);
           let updatedManuals = [...tbl.manualDisposables];
@@ -744,13 +755,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         return tbl;
-      })
-    );
+      });
+      saveTables(next).catch(() => {});
+      return next;
+    });
   };
 
   const removeManualDisposableFromTable = (tableId: string, ingredientId: string) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const next = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           const updatedManuals = tbl.manualDisposables.filter(m => m.ingredientId !== ingredientId);
           const itemsTotal = tbl.items.reduce((acc, curr) => acc + curr.itemTotal, 0);
@@ -763,8 +776,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         return tbl;
-      })
-    );
+      });
+      saveTables(next).catch(() => {});
+      return next;
+    });
   };
 
   // Enviar comanda a preparación (Cocina / Barra)
@@ -827,8 +842,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (origId === 'ing-fresa' || origId.includes('fresa')) return 'ing-pulpa-fresa';
           if (origId === 'ing-mango' || origId.includes('mango')) return 'ing-pulpa-mango';
           if (origId === 'ing-pina' || origId.includes('pina') || origId.includes('piña')) return 'ing-pulpa-pina';
-          const ing = updated.find(i => i.id === origId);
-          if (ing?.category === 'frutas') return 'ing-pulpa-mixta';
+          // Si la fruta no tiene pulpa específica (ej. plátano), se usa fresca
           return origId;
         };
 
@@ -904,6 +918,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
       }
 
+      saveIngredients(updated).catch(() => {});
       return updated;
     });
   };
@@ -1017,24 +1032,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     setOrders(prev => [newOrder, ...prev]);
+    saveOrder(newOrder).catch(() => {});
 
     setTables(prev => {
+      let nextTables: TableOrder[];
       if (tableId.startsWith('llevar-')) {
-        return prev.filter(tbl => tbl.tableId !== tableId);
+        nextTables = prev.filter(tbl => tbl.tableId !== tableId);
+      } else {
+        nextTables = prev.map(tbl =>
+          tbl.tableId === tableId
+            ? {
+                ...tbl,
+                status: 'libre',
+                items: [],
+                manualDisposables: [],
+                customerName: '',
+                total: 0,
+                sentToKitchenAt: undefined
+              }
+            : tbl
+        );
       }
-      return prev.map(tbl =>
-        tbl.tableId === tableId
-          ? {
-              ...tbl,
-              status: 'libre',
-              items: [],
-              manualDisposables: [],
-              customerName: '',
-              total: 0,
-              sentToKitchenAt: undefined
-            }
-          : tbl
-      );
+      saveTables(nextTables).catch(() => {});
+      return nextTables;
     });
 
     if (tableId.startsWith('llevar-') && activeTableId === tableId) {
@@ -1047,29 +1067,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Cancelar mesa o cerrar orden para llevar dinámica
   const cancelTable = (tableId: string) => {
-    if (tableId.startsWith('llevar-')) {
-      setTables(prev => prev.filter(tbl => tbl.tableId !== tableId));
-      if (activeTableId === tableId) {
-        setActiveTableId('mesa-1');
+    setTables(prev => {
+      let nextTables: TableOrder[];
+      if (tableId.startsWith('llevar-')) {
+        nextTables = prev.filter(tbl => tbl.tableId !== tableId);
+        if (activeTableId === tableId) {
+          setActiveTableId('mesa-1');
+        }
+      } else {
+        nextTables = prev.map(tbl =>
+          tbl.tableId === tableId
+            ? {
+                ...tbl,
+                status: 'libre',
+                items: [],
+                manualDisposables: [],
+                customerName: '',
+                total: 0,
+                sentToKitchenAt: undefined
+              }
+            : tbl
+        );
       }
-      return;
-    }
-
-    setTables(prev =>
-      prev.map(tbl =>
-        tbl.tableId === tableId
-          ? {
-              ...tbl,
-              status: 'libre',
-              items: [],
-              manualDisposables: [],
-              customerName: '',
-              total: 0,
-              sentToKitchenAt: undefined
-            }
-          : tbl
-      )
-    );
+      saveTables(nextTables).catch(() => {});
+      return nextTables;
+    });
   };
 
   // Agregar nuevo pedido para llevar paralelo
@@ -1086,7 +1108,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       manualDisposables: [],
       total: 0
     };
-    setTables(prev => [...prev, newTable]);
+    setTables(prev => {
+      const next = [...prev, newTable];
+      saveTables(next).catch(() => {});
+      return next;
+    });
     setActiveTableId(newId);
     return newId;
   };
@@ -1183,6 +1209,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
       });
+      saveIngredients(updated).catch(() => {});
       return updated;
     });
 
@@ -1278,6 +1305,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           lastUpdated: new Date().toISOString()
         };
       }
+      saveIngredients(updated).catch(() => {});
       return updated;
     });
     setBatches(prev => [newBatch, ...prev]);
@@ -1287,16 +1315,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetIng = ingredients.find(i => i.id === wasteData.ingredientId);
     let costLost = 0;
 
-    setIngredients(prev =>
-      prev.map(ing => {
+    setIngredients(prev => {
+      const updated = prev.map(ing => {
         if (ing.id === wasteData.ingredientId) {
           const { updatedIngredient, costOfDeduction } = deductFifoFromIngredient(ing, wasteData.quantity);
           costLost = costOfDeduction;
           return updatedIngredient;
         }
         return ing;
-      })
-    );
+      });
+      saveIngredients(updated).catch(() => {});
+      return updated;
+    });
 
     const newWaste: WasteRecord = {
       ...wasteData,
@@ -1316,11 +1346,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       code,
       createdAt: new Date().toISOString()
     };
-    setSuppliers(prev => [...prev, newSupplier]);
+    setSuppliers(prev => {
+      const next = [...prev, newSupplier];
+      saveSuppliers(next).catch(() => {});
+      return next;
+    });
   };
 
   const updateSupplier = (updated: Supplier) => {
-    setSuppliers(prev => prev.map(s => (s.id === updated.id ? updated : s)));
+    setSuppliers(prev => {
+      const next = prev.map(s => (s.id === updated.id ? updated : s));
+      saveSuppliers(next).catch(() => {});
+      return next;
+    });
   };
 
   // Gestión de Combos
@@ -1352,8 +1390,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sourceType: 'fruta_fresca' | 'pulpa_rescate',
     fruitIngredientId?: string
   ) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const next = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           return {
             ...tbl,
@@ -1373,8 +1411,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
         }
         return tbl;
-      })
-    );
+      });
+      saveTables(next).catch(() => {});
+      return next;
+    });
   };
 
   // Configuración de Empresa
@@ -1382,6 +1422,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCompanyConfig(prev => {
       const next = { ...prev, ...updated };
       localStorage.setItem('erp_company_config', JSON.stringify(next));
+      saveCompanyConfig(next).catch(() => {});
       return next;
     });
   };

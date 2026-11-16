@@ -101,7 +101,9 @@ export const KdsModule: React.FC = () => {
       }
     }
 
-    return fruitIngs.map(freshIng => {
+    const pairs: FruitPulpPair[] = [];
+
+    fruitIngs.forEach(freshIng => {
       let pulpIng: typeof ingredients[0] | undefined;
       const lower = freshIng.name.toLowerCase();
 
@@ -115,8 +117,9 @@ export const KdsModule: React.FC = () => {
         pulpIng = ingredients.find(i => i.id === 'ing-pulpa-pina');
       }
 
+      // Si la fruta no tiene contraparte de pulpa en inventario (ej. plátano), se consume 100% fresca y no se genera toggle
       if (!pulpIng) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-mixta') || ingredients.find(i => i.id.startsWith('ing-pulpa'));
+        return;
       }
 
       const fruitEmoji = lower.includes('fresa')
@@ -131,27 +134,34 @@ export const KdsModule: React.FC = () => {
         ? '🍌'
         : '🍎';
 
+      let shortFruitName = freshIng.name;
+      if (lower.includes('papaya')) shortFruitName = 'Papaya';
+      else if (lower.includes('fresa')) shortFruitName = 'Fresa';
+      else if (lower.includes('mango')) shortFruitName = 'Mango';
+      else if (lower.includes('piña') || lower.includes('pina')) shortFruitName = 'Piña';
+      else if (lower.includes('plátano')) shortFruitName = 'Plátano';
+
       // Fuente actual seleccionada para esta fruta individual
       const currentSource =
         item.selectedFruitSources?.[freshIng.id] ||
         item.selectedSourceType ||
         'fruta_fresca';
 
-      const shortFruitName = freshIng.name.replace(' Especial', '').replace(' Seleccionadas', '').replace(' Kent Dulce', '').replace(' Selva', '');
-
-      return {
+      pairs.push({
         fruitId: freshIng.id,
         fruitName: shortFruitName,
         fruitEmoji,
         freshStock: `${freshIng.stock} ${freshIng.unit}`,
         freshNum: freshIng.stock,
-        pulpId: pulpIng?.id || 'pulp-gen',
-        pulpName: pulpIng?.name || 'Pulpa Rescate',
-        pulpStock: pulpIng ? `${pulpIng.stock} ${pulpIng.unit}` : '0 kg',
-        pulpNum: pulpIng ? pulpIng.stock : 0,
+        pulpId: pulpIng.id,
+        pulpName: pulpIng.name,
+        pulpStock: `${pulpIng.stock} ${pulpIng.unit}`,
+        pulpNum: pulpIng.stock,
         currentSource
-      };
+      });
     });
+
+    return pairs;
   };
 
   const isLight = themeMode === 'light';
@@ -324,60 +334,56 @@ export const KdsModule: React.FC = () => {
                               </div>
                             )}
 
-                            {/* DECISIÓN OPERATIVA BARRA: ¿Fruta Fresca o Pulpa de Rescate con Stock en Vivo por cada fruta? */}
+                            {/* DECISIÓN OPERATIVA BARRA: ¿Fruta Fresca o Pulpa de Rescate (Pastilla Compacta por Fruta)? */}
                             {hasFruit && (() => {
                               const fruitPairs = getFruitPulpPairs(item);
                               if (fruitPairs.length === 0) return null;
 
                               return (
-                                <div className="pl-6 pt-1 space-y-1">
+                                <div className="pl-6 pt-1.5 space-y-1">
                                   {fruitPairs.map(p => {
                                     const isPulpForThisFruit = p.currentSource === 'pulpa_rescate';
                                     return (
-                                      <div key={p.fruitId} className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-0.5">
+                                      <div
+                                        key={p.fruitId}
+                                        className="flex items-center justify-between gap-2 max-w-[280px] bg-slate-900/60 border border-slate-800/80 rounded-lg px-2 py-0.5"
+                                      >
+                                        <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1 truncate">
                                           <span>{p.fruitEmoji}</span>
-                                          <span>{fruitPairs.length > 1 ? `${p.fruitName}:` : 'Stock:'}</span>
+                                          <span>{p.fruitName}</span>
                                         </span>
-                                        <button
-                                          type="button"
-                                          onClick={() => updateItemSourceType(order.tableId, item.id, 'fruta_fresca', p.fruitId)}
-                                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
-                                            !isPulpForThisFruit
-                                              ? 'bg-emerald-500/25 text-emerald-300 border-emerald-500/50 shadow-sm'
-                                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'
-                                          }`}
-                                          title={`Preparado con ${p.fruitName} fresca. Stock en almacén: ${p.freshStock}`}
-                                        >
-                                          <span>Fresca</span>
-                                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-black ${
-                                            p.freshNum > 1 ? 'bg-emerald-950 text-emerald-300 border border-emerald-700/50' : 'bg-rose-950 text-rose-300 border border-rose-700/50'
-                                          }`}>
-                                            {p.freshStock}
-                                          </span>
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => updateItemSourceType(order.tableId, item.id, 'pulpa_rescate', p.fruitId)}
-                                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-all flex items-center gap-1.5 ${
-                                            isPulpForThisFruit
-                                              ? 'bg-purple-500/30 text-purple-200 border-purple-500/60 shadow-sm font-black'
-                                              : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-purple-300'
-                                          }`}
-                                          title={`Preparado con pulpa de rescate (${p.pulpName}). Stock en almacén: ${p.pulpStock}`}
-                                        >
-                                          <span>🥣 Pulpa</span>
-                                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-mono font-black ${
-                                            p.pulpNum > 0.5 ? 'bg-purple-950 text-purple-300 border border-purple-700/50' : 'bg-rose-950 text-rose-300 border border-rose-700/50'
-                                          }`}>
-                                            {p.pulpStock}
-                                          </span>
-                                        </button>
-                                        {isPulpForThisFruit && (
-                                          <span className="text-[8px] text-purple-400 font-mono font-bold">
-                                            [Descontará pulpa {fruitPairs.length > 1 ? p.fruitName : ''}]
-                                          </span>
-                                        )}
+                                        <div className="inline-flex items-center p-0.5 rounded-md bg-slate-950 border border-slate-700/60 shrink-0">
+                                          <button
+                                            type="button"
+                                            onClick={() => updateItemSourceType(order.tableId, item.id, 'fruta_fresca', p.fruitId)}
+                                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                                              !isPulpForThisFruit
+                                                ? 'bg-emerald-600 text-white shadow-sm'
+                                                : 'text-slate-400 hover:text-slate-200'
+                                            }`}
+                                            title={`Preparado con fruta fresca (${p.fruitName}). Stock disponible: ${p.freshStock}`}
+                                          >
+                                            <span>Fresca</span>
+                                            <span className="text-[9px] font-mono opacity-80 font-normal">
+                                              {p.freshNum}k
+                                            </span>
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => updateItemSourceType(order.tableId, item.id, 'pulpa_rescate', p.fruitId)}
+                                            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
+                                              isPulpForThisFruit
+                                                ? 'bg-purple-600 text-white shadow-sm'
+                                                : 'text-slate-400 hover:text-purple-300'
+                                            }`}
+                                            title={`Preparado con pulpa de rescate (${p.fruitName}). Stock disponible: ${p.pulpStock}`}
+                                          >
+                                            <span>Pulpa</span>
+                                            <span className="text-[9px] font-mono opacity-80 font-normal">
+                                              {p.pulpNum}k
+                                            </span>
+                                          </button>
+                                        </div>
                                       </div>
                                     );
                                   })}
