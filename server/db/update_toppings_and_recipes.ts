@@ -208,3 +208,4 @@ if (menuRow) {
   db.prepare("UPDATE menu_config SET data = ?, updated_at = CURRENT_TIMESTAMP WHERE id = 'current'").run(JSON.stringify(menu));
   console.log('Todas las recetas actualizadas con toppings que descuentan de almacén.');
 }
+

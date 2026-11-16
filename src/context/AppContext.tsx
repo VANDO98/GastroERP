@@ -281,6 +281,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return (localStorage.getItem('erp_theme_mode') as 'dark' | 'light') || 'dark';
   });
 
+  useEffect(() => {
+    const root = document.documentElement;
+    if (themeMode === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [themeMode]);
+
   const toggleTheme = () => {
     setThemeMode(prev => {
       const next = prev === 'dark' ? 'light' : 'dark';
