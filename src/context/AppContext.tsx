@@ -769,8 +769,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enviar comanda a preparación (Cocina / Barra)
   const sendTableToKitchen = (tableId: string) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const updatedTables = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           const updatedItems: OrderItem[] = tbl.items.map(item => ({
             ...item,
@@ -780,13 +780,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return {
             ...tbl,
             items: updatedItems,
-            status: 'en_preparacion',
+            status: 'en_preparacion' as const,
             sentToKitchenAt: new Date().toISOString()
           };
         }
         return tbl;
-      })
-    );
+      });
+
+      // Persistir de inmediato al servidor para sincronizar KDS en tiempo real
+      saveTables(updatedTables).catch(() => {});
+      return updatedTables;
+    });
   };
 
   // Descontar inventario por receta BOM + modificadores + descartables automáticos + descartables manuales usando FIFO
@@ -1099,22 +1103,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const kdsOrders = tables.filter(t => t.status === 'en_preparacion' && t.items.length > 0);
 
   const markKdsItemsReady = (tableId: string) => {
-    setTables(prev =>
-      prev.map(tbl => {
+    setTables(prev => {
+      const updatedTables = prev.map(tbl => {
         if (tbl.tableId === tableId) {
           const updatedItems: OrderItem[] = tbl.items.map(item => ({
             ...item,
-            kitchenStatus: 'entregado'
+            kitchenStatus: 'entregado' as const
           }));
           return {
             ...tbl,
             items: updatedItems,
-            status: 'por_cobrar'
+            status: 'por_cobrar' as const
           };
         }
         return tbl;
-      })
-    );
+      });
+
+      saveTables(updatedTables).catch(() => {});
+      return updatedTables;
+    });
   };
 
   // Crear orden directa desde POS
