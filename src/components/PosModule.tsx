@@ -20,6 +20,7 @@ export const PosModule: React.FC = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeProductForModal, setActiveProductForModal] = useState<Product | null>(null);
   const [tempModifiers, setTempModifiers] = useState<QuickModifier[]>([]);
+  const [mobileTab, setMobileTab] = useState<'menu' | 'comanda'>('menu');
   const [showManualDisposablesModal, setShowManualDisposablesModal] = useState<boolean>(false);
 
   const disposableOptions = ingredients.filter(i => i.itemType === 'descartable');
@@ -371,8 +372,39 @@ export const PosModule: React.FC = () => {
         </button>
       </div>
 
+      {/* Barra de pestañas móviles (Catálogo / Comanda) solo visible en pantallas < lg */}
+      <div className="lg:hidden flex border-b bg-slate-900 border-slate-800">
+        <button
+          onClick={() => setMobileTab('menu')}
+          className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+            mobileTab === 'menu'
+              ? 'border-orange-500 text-orange-400 bg-orange-500/10'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>🍽️ Carta / Menú</span>
+        </button>
+        <button
+          onClick={() => setMobileTab('comanda')}
+          className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+            mobileTab === 'comanda'
+              ? 'border-orange-500 text-orange-400 bg-orange-500/10'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>📋 Comanda ({activeTable.items.length})</span>
+          {activeTable.total > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+              S/{activeTable.total.toFixed(0)}
+            </span>
+          )}
+        </button>
+      </div>
+
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className={'flex-1 flex flex-col overflow-hidden border-r ' + (isLight ? 'border-slate-300' : 'border-slate-800')}>
+        <div className={`flex-1 flex flex-col overflow-hidden border-r ${
+          isLight ? 'border-slate-300' : 'border-slate-800'
+        } ${mobileTab === 'comanda' ? 'hidden lg:flex' : 'flex'}`}>
           <div className={'p-3 border-b flex items-center justify-between gap-3 ' + (isLight ? 'bg-slate-200/70 border-slate-300' : 'bg-slate-900/60 border-slate-800')}>
             <div className="flex items-center gap-2">
               <button
@@ -491,7 +523,7 @@ export const PosModule: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                 {displayedProducts.map(product => {
                   const hasModifiers = product.quickModifiers && product.quickModifiers.length > 0;
                   const stockAlert = getProductStockAlert(product);
@@ -535,8 +567,9 @@ export const PosModule: React.FC = () => {
             )}
           </div>
         </div>
-        <div className={'w-full lg:w-96 flex flex-col justify-between border-t lg:border-t-0 lg:border-l shadow-2xl h-[48vh] lg:h-full ' +
-          (isLight ? 'bg-white border-slate-300' : 'bg-slate-900 border-slate-800')}>
+        <div className={`w-full lg:w-96 flex flex-col justify-between border-t lg:border-t-0 lg:border-l shadow-2xl flex-1 lg:h-full ${
+          isLight ? 'bg-white border-slate-300' : 'bg-slate-900 border-slate-800'
+        } ${mobileTab === 'menu' ? 'hidden lg:flex' : 'flex'}`}>
           <div className={'p-3 border-b flex items-center justify-between ' + (isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950/60 border-slate-800')}>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full bg-orange-500 animate-pulse"></div>
@@ -758,6 +791,26 @@ export const PosModule: React.FC = () => {
           </div>
         </div>
       </div>
+      {/* Botón flotante de acceso a Comanda en Móviles cuando se está explorando el Menú */}
+      {mobileTab === 'menu' && activeTable.items.length > 0 && (
+        <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
+          <button
+            onClick={() => setMobileTab('comanda')}
+            className="w-full py-3.5 px-5 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm shadow-2xl shadow-orange-600/50 flex items-center justify-between active:scale-95 transition-all border border-orange-400/40"
+          >
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-white text-orange-600 text-xs flex items-center justify-center font-bold">
+                {activeTable.items.length}
+              </span>
+              <span>Ver Comanda {activeTable.tableName}</span>
+            </div>
+            <span className="font-mono text-base font-extrabold">
+              S/ {activeTable.total.toFixed(2)} →
+            </span>
+          </button>
+        </div>
+      )}
+
       {activeProductForModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className={'border rounded-3xl p-5 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 ' + (isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white')}>

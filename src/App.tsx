@@ -16,6 +16,7 @@ import { SalesHistoryModule } from './components/SalesHistoryModule';
 import { PurchaseOrdersModule } from './components/PurchaseOrdersModule';
 import { ToppingsMasterModule } from './components/ToppingsMasterModule';
 import { SettingsModule } from './components/SettingsModule';
+import { ShoppingCart, Clock, Layers, Sparkles, Menu } from 'lucide-react';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<NavTabType>('pos');
@@ -23,7 +24,7 @@ function AppContent() {
   const isLight = themeMode === 'light';
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans select-none antialiased transition-colors ${isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'}`}>
+    <div className={`min-h-screen flex flex-col font-sans select-none antialiased transition-colors pb-14 sm:pb-0 ${isLight ? 'bg-slate-100 text-slate-800' : 'bg-slate-950 text-slate-100'}`}>
       {/* Barra superior de navegación y métricas */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
@@ -44,6 +45,51 @@ function AppContent() {
         {activeTab === 'suppliers' && <SuppliersModule />}
         {activeTab === 'settings' && <SettingsModule />}
       </main>
+
+      {/* Barra de navegación inferior fija para móviles (Mozo / Cocina rápido) */}
+      <nav className={`sm:hidden fixed bottom-0 left-0 right-0 h-14 border-t flex items-center justify-around z-30 px-2 ${
+        isLight ? 'bg-white border-slate-200 text-slate-700' : 'bg-slate-900 border-slate-800 text-slate-300'
+      }`}>
+        <button
+          onClick={() => setActiveTab('pos')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 ${
+            activeTab === 'pos' ? 'text-orange-500 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <ShoppingCart className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">POS</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('kds')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 ${
+            activeTab === 'kds' ? 'text-orange-500 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <Clock className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">KDS Barra</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('combos')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 ${
+            activeTab === 'combos' ? 'text-orange-500 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <Sparkles className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Combos</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('production')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 ${
+            activeTab === 'production' ? 'text-orange-500 font-bold' : 'text-slate-400'
+          }`}
+        >
+          <Layers className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Producción</span>
+        </button>
+      </nav>
     </div>
   );
 }

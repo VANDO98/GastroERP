@@ -313,7 +313,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         </div>
 
         {/* Centro: Accesos Directos Operativos de Alta Frecuencia (Piso de Ventas & Barra) */}
-        <nav className={`flex items-center p-1 rounded-2xl border gap-1 ${
+        <nav className={`hidden sm:flex items-center p-1 rounded-2xl border gap-1 ${
           isLight ? 'bg-slate-200/80 border-slate-300' : 'bg-slate-900/60 border-slate-800'
         }`}>
           {/* POS Mesas */}
