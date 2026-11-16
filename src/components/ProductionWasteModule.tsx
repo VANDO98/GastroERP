@@ -1212,12 +1212,16 @@ export const ProductionWasteModule: React.FC = () => {
                       onClick={() => setWasteIngId(ing.id)}
                       className={`p-2 rounded-xl text-left border text-xs transition-all ${
                         wasteIngId === ing.id
-                          ? 'border-rose-500 bg-rose-500/15 text-rose-400 font-black'
+                          ? 'border-rose-500 bg-rose-500/15 text-rose-600 dark:text-rose-400 font-black'
+                          : isLight
+                          ? 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100 hover:border-slate-300'
                           : 'border-slate-800 bg-slate-950/60 text-slate-400 hover:border-slate-700'
                       }`}
                     >
                       <div className="truncate font-bold">{ing.name}</div>
-                      <div className="text-[10px] text-slate-500 font-mono">Stock: {ing.stock} {ing.unit}</div>
+                      <div className={`text-[10px] font-mono ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                        Stock: {ing.stock} {ing.unit}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -1442,7 +1446,7 @@ export const ProductionWasteModule: React.FC = () => {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="text-slate-500 font-bold border-b border-slate-800/40">
+                            <tr className={`font-bold border-b ${isLight ? 'text-slate-600 border-slate-200' : 'text-slate-400 border-slate-800/40'}`}>
                               <th className="pb-1.5">INSUMO</th>
                               <th className="pb-1.5 text-center">CANT. REQUERIDA</th>
                               <th className="pb-1.5 text-center">% MERMA</th>
@@ -1451,17 +1455,17 @@ export const ProductionWasteModule: React.FC = () => {
                               <th className="pb-1.5 text-right">TOTAL</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/30">
+                          <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/30'}`}>
                             {viewingOpDetail.requiredIngredients.map((ing, ingIdx) => (
-                              <tr key={ingIdx}>
-                                <td className="py-1.5 font-semibold text-slate-300">{ing.ingredientName}</td>
-                                <td className="py-1.5 text-center font-mono">{ing.quantityRequired} {ing.unit}</td>
-                                <td className="py-1.5 text-center font-mono text-slate-400">{ing.wastePercent}%</td>
-                                <td className="py-1.5 text-center font-mono font-bold text-orange-400">
+                              <tr key={ingIdx} className={isLight ? 'hover:bg-slate-100/60' : 'hover:bg-slate-900/40'}>
+                                <td className={`py-1.5 font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{ing.ingredientName}</td>
+                                <td className={`py-1.5 text-center font-mono ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{ing.quantityRequired} {ing.unit}</td>
+                                <td className={`py-1.5 text-center font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{ing.wastePercent}%</td>
+                                <td className="py-1.5 text-center font-mono font-bold text-orange-600 dark:text-orange-400">
                                   {(ing.quantityReal ?? (ing.quantityRequired + (ing.wasteQuantity || 0))).toFixed(3)} {ing.unit}
                                 </td>
-                                <td className="py-1.5 text-right font-mono text-slate-400">S/ {ing.unitCost.toFixed(2)}</td>
-                                <td className="py-1.5 text-right font-mono font-black text-slate-200">S/ {ing.totalCost.toFixed(2)}</td>
+                                <td className={`py-1.5 text-right font-mono ${isLight ? 'text-slate-700 font-semibold' : 'text-slate-300'}`}>S/ {ing.unitCost.toFixed(2)}</td>
+                                <td className={`py-1.5 text-right font-mono font-black ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>S/ {ing.totalCost.toFixed(2)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1491,22 +1495,22 @@ export const ProductionWasteModule: React.FC = () => {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs">
                           <thead>
-                            <tr className="text-slate-500 font-bold border-b border-slate-800/40">
+                            <tr className={`font-bold border-b ${isLight ? 'text-slate-600 border-slate-200' : 'text-slate-400 border-slate-800/40'}`}>
                               <th className="pb-1.5">INSUMO</th>
                               <th className="pb-1.5 text-center">CANT. CONSUMIDA</th>
                               <th className="pb-1.5 text-right">COSTO UNITARIO</th>
                               <th className="pb-1.5 text-right">VALORIZADO S/</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/30">
+                          <tbody className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-slate-800/30'}`}>
                             {group.items.map((ing, ingIdx) => (
-                              <tr key={ingIdx}>
-                                <td className="py-1.5 font-semibold text-slate-300">{ing.ingredientName}</td>
-                                <td className="py-1.5 text-center font-mono font-bold text-orange-400">
+                              <tr key={ingIdx} className={isLight ? 'hover:bg-slate-100/60' : 'hover:bg-slate-900/40'}>
+                                <td className={`py-1.5 font-bold ${isLight ? 'text-slate-900' : 'text-slate-200'}`}>{ing.ingredientName}</td>
+                                <td className="py-1.5 text-center font-mono font-bold text-orange-600 dark:text-orange-400">
                                   {(ing.quantityReal ?? (ing.quantityRequired + (ing.wasteQuantity || 0))).toFixed(3)} {ing.unit}
                                 </td>
-                                <td className="py-1.5 text-right font-mono text-slate-400">S/ {ing.unitCost.toFixed(2)}</td>
-                                <td className="py-1.5 text-right font-mono font-black text-slate-200">S/ {ing.totalCost.toFixed(2)}</td>
+                                <td className={`py-1.5 text-right font-mono ${isLight ? 'text-slate-700 font-semibold' : 'text-slate-300'}`}>S/ {ing.unitCost.toFixed(2)}</td>
+                                <td className={`py-1.5 text-right font-mono font-black ${isLight ? 'text-slate-900' : 'text-slate-100'}`}>S/ {ing.totalCost.toFixed(2)}</td>
                               </tr>
                             ))}
                           </tbody>

@@ -304,13 +304,17 @@ export const KdsModule: React.FC = () => {
                         return (
                           <div key={item.id || idx} className="pl-1 border-l-2 border-orange-500 space-y-1">
                             <div className="flex items-baseline justify-between gap-1">
-                              <span className="font-black text-sm text-white flex items-center gap-1.5">
+                              <span className={`font-black text-sm flex items-center gap-1.5 ${
+                                isLight ? 'text-slate-900' : 'text-white'
+                              }`}>
                                 <span className="w-5 h-5 rounded-md bg-orange-600 text-white flex items-center justify-center text-xs font-mono font-black">
                                   {item.quantity}x
                                 </span>
                                 <span>{item.name}</span>
                                 {item.isCombo && (
-                                  <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.2 rounded font-bold">
+                                  <span className={`text-[9px] border px-1.5 py-0.2 rounded font-bold ${
+                                    isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                  }`}>
                                     COMBO
                                   </span>
                                 )}
@@ -320,8 +324,10 @@ export const KdsModule: React.FC = () => {
                             {item.isCombo && item.comboItems && (
                               <div className="pl-6 mt-1 space-y-0.5">
                                 {item.comboItems.map((ci, i) => (
-                                  <div key={i} className="text-xs text-amber-200 font-bold flex items-center gap-1.5">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                                  <div key={i} className={`text-xs font-bold flex items-center gap-1.5 ${
+                                    isLight ? 'text-amber-800' : 'text-amber-200'
+                                  }`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                                     <span>{ci.quantity * item.quantity}x {ci.name}</span>
                                   </div>
                                 ))}
@@ -333,7 +339,9 @@ export const KdsModule: React.FC = () => {
                                 {item.selectedModifiers.map(mod => (
                                   <span
                                     key={mod.id}
-                                    className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                      isLight ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                    }`}
                                   >
                                     ★ {mod.label}
                                   </span>
@@ -353,20 +361,26 @@ export const KdsModule: React.FC = () => {
                                     return (
                                       <div
                                         key={p.fruitId}
-                                        className="flex items-center justify-between gap-2 max-w-[280px] bg-slate-900/60 border border-slate-800/80 rounded-lg px-2 py-0.5"
+                                        className={`flex items-center justify-between gap-2 max-w-[280px] rounded-lg px-2 py-0.5 border ${
+                                          isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-900/60 border-slate-800/80'
+                                        }`}
                                       >
-                                        <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1 truncate">
+                                        <span className={`text-[11px] font-bold flex items-center gap-1 truncate ${
+                                          isLight ? 'text-slate-800' : 'text-slate-300'
+                                        }`}>
                                           <span>{p.fruitEmoji}</span>
                                           <span>{p.fruitName}</span>
                                         </span>
-                                        <div className="inline-flex items-center p-0.5 rounded-md bg-slate-950 border border-slate-700/60 shrink-0">
+                                        <div className={`inline-flex items-center p-0.5 rounded-md border shrink-0 ${
+                                          isLight ? 'bg-white border-slate-300' : 'bg-slate-950 border-slate-700/60'
+                                        }`}>
                                           <button
                                             type="button"
                                             onClick={() => updateItemSourceType(order.tableId, item.id, 'fruta_fresca', p.fruitId)}
                                             className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
                                               !isPulpForThisFruit
                                                 ? 'bg-emerald-600 text-white shadow-sm'
-                                                : 'text-slate-400 hover:text-slate-200'
+                                                : isLight ? 'text-slate-600 hover:text-slate-900' : 'text-slate-400 hover:text-slate-200'
                                             }`}
                                             title={`Preparado con pack porcionado fresco (${p.fruitName}). Stock disponible: ${p.freshStock}`}
                                           >
@@ -381,7 +395,7 @@ export const KdsModule: React.FC = () => {
                                             className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all flex items-center gap-1 ${
                                               isPulpForThisFruit
                                                 ? 'bg-purple-600 text-white shadow-sm'
-                                                : 'text-slate-400 hover:text-purple-300'
+                                                : isLight ? 'text-slate-600 hover:text-purple-700' : 'text-slate-400 hover:text-purple-300'
                                             }`}
                                             title={`Preparado con pulpa congelada (${p.pulpName}). Stock disponible: ${p.pulpStock}`}
                                           >
@@ -427,10 +441,12 @@ export const KdsModule: React.FC = () => {
                 </div>
 
                 {/* Botón de Despacho */}
-                <div className="p-3 bg-slate-950/40 border-t border-slate-800">
+                <div className={`p-3 border-t ${
+                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/40 border-slate-800'
+                }`}>
                   <button
                     onClick={() => markKdsItemsReady(order.tableId)}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all"
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-extrabold text-xs rounded-2xl shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
                   >
                     <Check className="w-4 h-4 stroke-[3]" />
                     <span>MARCAR LISTO / DESPACHADO</span>
