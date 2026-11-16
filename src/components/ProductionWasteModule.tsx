@@ -155,6 +155,20 @@ export const ProductionWasteModule: React.FC = () => {
               { ingredientId: 'ing-fresa', quantity: 0.150, unit: 'kg' },
               { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }
             ];
+          } else if (sub.code === 'SUB-020') {
+            // Base Neutra para Frappés Lácteos (por cada 1 kg producido)
+            bom = [
+              { ingredientId: 'ing-crema-no-lactea', quantity: 0.298, unit: 'kg' },
+              { ingredientId: 'ing-leche-polvo', quantity: 0.358, unit: 'kg' },
+              { ingredientId: 'ing-azucar-glass', quantity: 0.298, unit: 'kg' },
+              { ingredientId: 'ing-cmc', quantity: 0.046, unit: 'kg' }
+            ];
+          } else if (sub.code === 'SUB-021') {
+            // Base Cristal para Frappés al Agua (por cada 1 kg producido)
+            bom = [
+              { ingredientId: 'ing-azucar', quantity: 0.978, unit: 'kg' },
+              { ingredientId: 'ing-cmc', quantity: 0.022, unit: 'kg' }
+            ];
           } else {
             bom = [{ ingredientId: 'ing-papaya', quantity: 1.0, unit: 'kg' }];
           }
@@ -196,6 +210,14 @@ export const ProductionWasteModule: React.FC = () => {
       return;
     }
     const isUnit = recipe.unit === 'und';
+    const defaultQty = recipe.code === 'SUB-020'
+      ? 0.670
+      : recipe.code === 'SUB-021'
+      ? 0.920
+      : isUnit
+      ? 10
+      : 5.0;
+
     setSelectedRecipes(prev => [
       ...prev,
       {
@@ -203,8 +225,8 @@ export const ProductionWasteModule: React.FC = () => {
         recipeCode: recipe.code,
         recipeName: recipe.name,
         unit: recipe.unit,
-        estimatedQuantity: isUnit ? 10 : 5.0,
-        resultQuantity: isUnit ? 10 : 4.8,
+        estimatedQuantity: defaultQty,
+        resultQuantity: defaultQty,
         bom: recipe.recipeBom,
         targetIngredientId: recipe.targetIngredientId
       }

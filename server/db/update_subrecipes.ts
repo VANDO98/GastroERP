@@ -26,3 +26,4 @@ db.prepare('INSERT OR REPLACE INTO menu_config (id, data, updated_at) VALUES (?,
 );
 
 console.log('Semielaborados y menu_config actualizados con exito en SQLite.');
+
