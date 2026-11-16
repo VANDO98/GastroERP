@@ -159,6 +159,86 @@ export const initialIngredients: Ingredient[] = [
     ]
   },
   {
+    id: 'sub-mix-surtido-fresco',
+    code: 'SUB-010',
+    name: 'Pack Mix Surtido Fresco (270g)',
+    itemType: 'subreceta',
+    category: 'jarabes_bases',
+    unit: 'und',
+    stock: 35,
+    minStock: 10,
+    costPerUnit: 1.65,
+    isTaxAffected: false,
+    isIntermediateRecipe: true,
+    batches: [
+      { id: 'batch-mix-fresco-1', date: '2026-11-15T07:30:00Z', initialQty: 35, remainingQty: 35, unitCost: 1.65 }
+    ]
+  },
+  {
+    id: 'sub-porcion-mango-fresco',
+    code: 'SUB-011',
+    name: 'Pack Mango Limpio Porcionado (180g)',
+    itemType: 'subreceta',
+    category: 'jarabes_bases',
+    unit: 'und',
+    stock: 20,
+    minStock: 5,
+    costPerUnit: 2.20,
+    isTaxAffected: false,
+    isIntermediateRecipe: true,
+    batches: [
+      { id: 'batch-mango-porcion-1', date: '2026-11-15T07:30:00Z', initialQty: 20, remainingQty: 20, unitCost: 2.20 }
+    ]
+  },
+  {
+    id: 'sub-porcion-fresa-limpia',
+    code: 'SUB-012',
+    name: 'Pack Fresa Limpia Porcionada (150g)',
+    itemType: 'subreceta',
+    category: 'jarabes_bases',
+    unit: 'und',
+    stock: 25,
+    minStock: 8,
+    costPerUnit: 1.35,
+    isTaxAffected: false,
+    isIntermediateRecipe: true,
+    batches: [
+      { id: 'batch-fresa-porcion-1', date: '2026-11-15T07:30:00Z', initialQty: 25, remainingQty: 25, unitCost: 1.35 }
+    ]
+  },
+  {
+    id: 'sub-porcion-papaya-limpia',
+    code: 'SUB-013',
+    name: 'Pack Papaya Limpia Porcionada (200g)',
+    itemType: 'subreceta',
+    category: 'jarabes_bases',
+    unit: 'und',
+    stock: 20,
+    minStock: 5,
+    costPerUnit: 0.95,
+    isTaxAffected: false,
+    isIntermediateRecipe: true,
+    batches: [
+      { id: 'batch-papaya-porcion-1', date: '2026-11-15T07:30:00Z', initialQty: 20, remainingQty: 20, unitCost: 0.95 }
+    ]
+  },
+  {
+    id: 'sub-porcion-pina-limpia',
+    code: 'SUB-014',
+    name: 'Pack Piña Limpia Porcionada (180g)',
+    itemType: 'subreceta',
+    category: 'jarabes_bases',
+    unit: 'und',
+    stock: 20,
+    minStock: 5,
+    costPerUnit: 1.05,
+    isTaxAffected: false,
+    isIntermediateRecipe: true,
+    batches: [
+      { id: 'batch-pina-porcion-1', date: '2026-11-15T07:30:00Z', initialQty: 20, remainingQty: 20, unitCost: 1.05 }
+    ]
+  },
+  {
     id: 'ing-leche-entera',
     code: 'LAC-001',
     name: 'Leche Fresca Entera Pasteurizada',

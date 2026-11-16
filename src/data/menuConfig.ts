@@ -44,10 +44,7 @@ export const initialMenuConfig: MenuConfig = {
                 { id: "m-algarrobina-plus", label: "+ Algarrobina", priceDelta: 1.50, inventoryImpact: [{ ingredientId: "ing-algarrobina", qtyDelta: 0.020 }] }
               ],
               recipeBom: [
-                { ingredientId: "ing-papaya", quantity: 0.100, unit: "kg" },
-                { ingredientId: "ing-pina", quantity: 0.080, unit: "kg" },
-                { ingredientId: "ing-platano", quantity: 0.050, unit: "kg" },
-                { ingredientId: "ing-fresa", quantity: 0.040, unit: "kg" },
+                { ingredientId: "sub-mix-surtido-fresco", quantity: 1, unit: "und" },
                 { ingredientId: "ing-azucar", quantity: 0.025, unit: "kg" },
                 { ingredientId: "ing-vaso-domo-16oz", quantity: 1, unit: "und" }
               ]
@@ -72,7 +69,7 @@ export const initialMenuConfig: MenuConfig = {
                 { id: "m-deslactosada", label: "Deslactosada", priceDelta: 1.50, toppingMasterId: "top-leche-deslact", ingredientId: "ing-leche-deslact", quantity: 0.200, unit: "L" }
               ],
               recipeBom: [
-                { ingredientId: "ing-fresa", quantity: 0.150, unit: "kg" },
+                { ingredientId: "sub-porcion-fresa-limpia", quantity: 1, unit: "und" },
                 { ingredientId: "ing-leche-entera", quantity: 0.200, unit: "L" },
                 { ingredientId: "ing-azucar", quantity: 0.025, unit: "kg" },
                 { ingredientId: "ing-vaso-domo-16oz", quantity: 1, unit: "und" }
@@ -98,7 +95,7 @@ export const initialMenuConfig: MenuConfig = {
                 { id: "m-al-tiempo", label: "Al Tiempo", priceDelta: 0.00 }
               ],
               recipeBom: [
-                { ingredientId: "ing-mango", quantity: 0.180, unit: "kg" },
+                { ingredientId: "sub-porcion-mango-fresco", quantity: 1, unit: "und" },
                 { ingredientId: "ing-azucar", quantity: 0.020, unit: "kg" },
                 { ingredientId: "ing-vaso-domo-16oz", quantity: 1, unit: "und" }
               ]

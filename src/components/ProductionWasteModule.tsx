@@ -118,14 +118,46 @@ export const ProductionWasteModule: React.FC = () => {
       .filter(i => i.itemType === 'subreceta')
       .forEach(sub => {
         if (!list.some(r => r.code === sub.code || r.targetIngredientId === sub.id)) {
-          // Asociar un BOM estándar según la fruta
+          // Asociar un BOM estándar según la fruta y subreceta
           let bom: BomItem[] = [];
-          if (sub.code === 'SUB-005') bom = [{ ingredientId: 'ing-papaya', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          else if (sub.code === 'SUB-006') bom = [{ ingredientId: 'ing-fresa', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          else if (sub.code === 'SUB-007') bom = [{ ingredientId: 'ing-pina', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          else if (sub.code === 'SUB-008') bom = [{ ingredientId: 'ing-mango', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          else if (sub.code === 'SUB-001') bom = [{ ingredientId: 'ing-papaya', quantity: 0.450, unit: 'kg' }, { ingredientId: 'ing-pina', quantity: 0.350, unit: 'kg' }, { ingredientId: 'ing-fresa', quantity: 0.150, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          else bom = [{ ingredientId: 'ing-papaya', quantity: 1.0, unit: 'kg' }];
+          if (sub.code === 'SUB-010') {
+            // Pack Mix Surtido Fresco (270g) por pack individual (con merma técnica de pelado)
+            bom = [
+              { ingredientId: 'ing-papaya', quantity: 0.140, unit: 'kg' },
+              { ingredientId: 'ing-pina', quantity: 0.130, unit: 'kg' },
+              { ingredientId: 'ing-platano', quantity: 0.075, unit: 'kg' },
+              { ingredientId: 'ing-fresa', quantity: 0.045, unit: 'kg' }
+            ];
+          } else if (sub.code === 'SUB-011') {
+            // Pack Mango Limpio Porcionado (180g)
+            bom = [{ ingredientId: 'ing-mango', quantity: 0.260, unit: 'kg' }];
+          } else if (sub.code === 'SUB-012') {
+            // Pack Fresa Limpia Porcionada (150g)
+            bom = [{ ingredientId: 'ing-fresa', quantity: 0.165, unit: 'kg' }];
+          } else if (sub.code === 'SUB-013') {
+            // Pack Papaya Limpia Porcionada (200g)
+            bom = [{ ingredientId: 'ing-papaya', quantity: 0.285, unit: 'kg' }];
+          } else if (sub.code === 'SUB-014') {
+            // Pack Piña Limpia Porcionada (180g)
+            bom = [{ ingredientId: 'ing-pina', quantity: 0.300, unit: 'kg' }];
+          } else if (sub.code === 'SUB-005') {
+            bom = [{ ingredientId: 'ing-papaya', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
+          } else if (sub.code === 'SUB-006') {
+            bom = [{ ingredientId: 'ing-fresa', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
+          } else if (sub.code === 'SUB-007') {
+            bom = [{ ingredientId: 'ing-pina', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
+          } else if (sub.code === 'SUB-008') {
+            bom = [{ ingredientId: 'ing-mango', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
+          } else if (sub.code === 'SUB-001') {
+            bom = [
+              { ingredientId: 'ing-papaya', quantity: 0.450, unit: 'kg' },
+              { ingredientId: 'ing-pina', quantity: 0.350, unit: 'kg' },
+              { ingredientId: 'ing-fresa', quantity: 0.150, unit: 'kg' },
+              { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }
+            ];
+          } else {
+            bom = [{ ingredientId: 'ing-papaya', quantity: 1.0, unit: 'kg' }];
+          }
 
           list.push({
             id: `rec-${sub.id}`,
@@ -163,6 +195,7 @@ export const ProductionWasteModule: React.FC = () => {
       showNotice(`La receta "${recipe.name}" ya está en la lista.`);
       return;
     }
+    const isUnit = recipe.unit === 'und';
     setSelectedRecipes(prev => [
       ...prev,
       {
@@ -170,8 +203,8 @@ export const ProductionWasteModule: React.FC = () => {
         recipeCode: recipe.code,
         recipeName: recipe.name,
         unit: recipe.unit,
-        estimatedQuantity: 5.0,
-        resultQuantity: 4.8,
+        estimatedQuantity: isUnit ? 10 : 5.0,
+        resultQuantity: isUnit ? 10 : 4.8,
         bom: recipe.recipeBom,
         targetIngredientId: recipe.targetIngredientId
       }

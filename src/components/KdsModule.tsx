@@ -46,7 +46,7 @@ export const KdsModule: React.FC = () => {
     currentSource: 'fruta_fresca' | 'pulpa_rescate';
   }
 
-  // Detectar todas las frutas presentes en el ítem (BOM o por nombre) con su respectiva pulpa y stock
+  // Detectar frutas y semielaborados porcionados en el ítem (BOM o por nombre) con su respectiva pulpa y stock
   const getFruitPulpPairs = (item: OrderItem): FruitPulpPair[] => {
     const fruitIngs: typeof ingredients = [];
 
@@ -56,6 +56,15 @@ export const KdsModule: React.FC = () => {
         if (
           ing &&
           (ing.category === 'frutas' ||
+            ing.id.startsWith('sub-mix') ||
+            ing.id.startsWith('sub-porcion') ||
+            (ing.itemType === 'subreceta' &&
+              (ing.id.includes('fruta') ||
+                ing.id.includes('surtid') ||
+                ing.id.includes('mango') ||
+                ing.id.includes('fresa') ||
+                ing.id.includes('papaya') ||
+                ing.id.includes('pina'))) ||
             (ing.unit === 'kg' &&
               ing.itemType === 'insumo' &&
               (ing.name.toLowerCase().includes('fruta') ||
@@ -77,27 +86,21 @@ export const KdsModule: React.FC = () => {
     // Inferencia por nombre si no tiene ingredientes de fruta explícitos en el BOM
     if (fruitIngs.length === 0) {
       const lower = item.name.toLowerCase();
-      if (lower.includes('mango')) {
-        const m = ingredients.find(i => i.id === 'ing-mango');
-        if (m && !fruitIngs.some(f => f.id === m.id)) fruitIngs.push(m);
-      }
-      if (lower.includes('fresa')) {
-        const f = ingredients.find(i => i.id === 'ing-fresa');
-        if (f && !fruitIngs.some(f => f.id === f.id)) fruitIngs.push(f);
-      }
-      if (lower.includes('papaya')) {
-        const p = ingredients.find(i => i.id === 'ing-papaya');
-        if (p && !fruitIngs.some(f => f.id === p.id)) fruitIngs.push(p);
-      }
-      if (lower.includes('piña') || lower.includes('pina')) {
-        const pi = ingredients.find(i => i.id === 'ing-pina');
-        if (pi && !fruitIngs.some(f => f.id === pi.id)) fruitIngs.push(pi);
-      }
       if (lower.includes('surtido')) {
-        ['ing-papaya', 'ing-pina', 'ing-fresa'].forEach(id => {
-          const ing = ingredients.find(i => i.id === id);
-          if (ing && !fruitIngs.some(f => f.id === ing.id)) fruitIngs.push(ing);
-        });
+        const mix = ingredients.find(i => i.id === 'sub-mix-surtido-fresco') || ingredients.find(i => i.id === 'ing-papaya');
+        if (mix && !fruitIngs.some(f => f.id === mix.id)) fruitIngs.push(mix);
+      } else if (lower.includes('mango')) {
+        const m = ingredients.find(i => i.id === 'sub-porcion-mango-fresco') || ingredients.find(i => i.id === 'ing-mango');
+        if (m && !fruitIngs.some(f => f.id === m.id)) fruitIngs.push(m);
+      } else if (lower.includes('fresa')) {
+        const f = ingredients.find(i => i.id === 'sub-porcion-fresa-limpia') || ingredients.find(i => i.id === 'ing-fresa');
+        if (f && !fruitIngs.some(f => f.id === f.id)) fruitIngs.push(f);
+      } else if (lower.includes('papaya')) {
+        const p = ingredients.find(i => i.id === 'sub-porcion-papaya-limpia') || ingredients.find(i => i.id === 'ing-papaya');
+        if (p && !fruitIngs.some(f => f.id === p.id)) fruitIngs.push(p);
+      } else if (lower.includes('piña') || lower.includes('pina')) {
+        const pi = ingredients.find(i => i.id === 'sub-porcion-pina-limpia') || ingredients.find(i => i.id === 'ing-pina');
+        if (pi && !fruitIngs.some(f => f.id === pi.id)) fruitIngs.push(pi);
       }
     }
 
@@ -106,14 +109,17 @@ export const KdsModule: React.FC = () => {
     fruitIngs.forEach(freshIng => {
       let pulpIng: typeof ingredients[0] | undefined;
       const lower = freshIng.name.toLowerCase();
+      const idLower = freshIng.id.toLowerCase();
 
-      if (freshIng.id === 'ing-papaya' || lower.includes('papaya')) {
+      if (idLower.includes('surtid') || idLower.includes('mix') || lower.includes('surtid')) {
+        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-mixta');
+      } else if (idLower.includes('papaya') || lower.includes('papaya')) {
         pulpIng = ingredients.find(i => i.id === 'ing-pulpa-papaya');
-      } else if (freshIng.id === 'ing-fresa' || lower.includes('fresa')) {
+      } else if (idLower.includes('fresa') || lower.includes('fresa')) {
         pulpIng = ingredients.find(i => i.id === 'ing-pulpa-fresa');
-      } else if (freshIng.id === 'ing-mango' || lower.includes('mango')) {
+      } else if (idLower.includes('mango') || lower.includes('mango')) {
         pulpIng = ingredients.find(i => i.id === 'ing-pulpa-mango');
-      } else if (freshIng.id === 'ing-pina' || lower.includes('pina') || lower.includes('piña')) {
+      } else if (idLower.includes('pina') || lower.includes('pina') || lower.includes('piña')) {
         pulpIng = ingredients.find(i => i.id === 'ing-pulpa-pina');
       }
 
@@ -122,24 +128,25 @@ export const KdsModule: React.FC = () => {
         return;
       }
 
-      const fruitEmoji = lower.includes('fresa')
-        ? '🍓'
-        : lower.includes('mango')
-        ? '🥭'
-        : lower.includes('papaya')
-        ? '🍈'
-        : lower.includes('piña') || lower.includes('pina')
-        ? '🍍'
-        : lower.includes('plátano')
-        ? '🍌'
-        : '🍎';
-
+      let fruitEmoji = '🍎';
       let shortFruitName = freshIng.name;
-      if (lower.includes('papaya')) shortFruitName = 'Papaya';
-      else if (lower.includes('fresa')) shortFruitName = 'Fresa';
-      else if (lower.includes('mango')) shortFruitName = 'Mango';
-      else if (lower.includes('piña') || lower.includes('pina')) shortFruitName = 'Piña';
-      else if (lower.includes('plátano')) shortFruitName = 'Plátano';
+
+      if (idLower.includes('surtid') || idLower.includes('mix') || lower.includes('surtid')) {
+        fruitEmoji = '🍹';
+        shortFruitName = 'Mix Surtido';
+      } else if (idLower.includes('fresa') || lower.includes('fresa')) {
+        fruitEmoji = '🍓';
+        shortFruitName = 'Fresa';
+      } else if (idLower.includes('mango') || lower.includes('mango')) {
+        fruitEmoji = '🥭';
+        shortFruitName = 'Mango';
+      } else if (idLower.includes('papaya') || lower.includes('papaya')) {
+        fruitEmoji = '🍈';
+        shortFruitName = 'Papaya';
+      } else if (idLower.includes('pina') || lower.includes('pina') || lower.includes('piña')) {
+        fruitEmoji = '🍍';
+        shortFruitName = 'Piña';
+      }
 
       // Fuente actual seleccionada para esta fruta individual
       const currentSource =
@@ -361,11 +368,11 @@ export const KdsModule: React.FC = () => {
                                                 ? 'bg-emerald-600 text-white shadow-sm'
                                                 : 'text-slate-400 hover:text-slate-200'
                                             }`}
-                                            title={`Preparado con fruta fresca (${p.fruitName}). Stock disponible: ${p.freshStock}`}
+                                            title={`Preparado con pack porcionado fresco (${p.fruitName}). Stock disponible: ${p.freshStock}`}
                                           >
-                                            <span>Fresca</span>
+                                            <span>Fresco</span>
                                             <span className="text-[9px] font-mono opacity-80 font-normal">
-                                              {p.freshNum}k
+                                              {p.freshNum}{p.freshStock.includes('und') ? 'u' : 'k'}
                                             </span>
                                           </button>
                                           <button
@@ -376,11 +383,11 @@ export const KdsModule: React.FC = () => {
                                                 ? 'bg-purple-600 text-white shadow-sm'
                                                 : 'text-slate-400 hover:text-purple-300'
                                             }`}
-                                            title={`Preparado con pulpa de rescate (${p.fruitName}). Stock disponible: ${p.pulpStock}`}
+                                            title={`Preparado con pulpa congelada (${p.pulpName}). Stock disponible: ${p.pulpStock}`}
                                           >
                                             <span>Pulpa</span>
                                             <span className="text-[9px] font-mono opacity-80 font-normal">
-                                              {p.pulpNum}k
+                                              {p.pulpNum}{p.pulpStock.includes('und') ? 'u' : 'k'}
                                             </span>
                                           </button>
                                         </div>

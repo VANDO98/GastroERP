@@ -85,3 +85,11 @@ export async function saveWaste(waste: any) {
   });
 }
 
+export async function saveProductionOrder(op: any) {
+  return fetch(`${API_URL}/production-orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(op)
+  });
+}
+

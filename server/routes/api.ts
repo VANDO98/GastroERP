@@ -353,6 +353,23 @@ export function createApiRouter(io: Server) {
     }
   });
 
+  // 10. Órdenes de Producción (Mise en Place / Subrecetas)
+  router.post('/production-orders', (req, res) => {
+    try {
+      const op = req.body;
+      db.prepare(`
+        INSERT OR REPLACE INTO production_orders 
+        (id, data, created_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+      `).run(op.id, JSON.stringify(op));
+
+      io.emit('production_order:created', op);
+      res.json({ success: true, order: op });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   return router;
 }
 

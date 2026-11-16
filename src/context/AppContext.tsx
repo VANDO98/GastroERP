@@ -44,7 +44,8 @@ import {
   saveOrder,
   saveInvoice,
   saveSuppliers,
-  saveWaste
+  saveWaste,
+  saveProductionOrder
 } from '../services/apiService';
 
 
@@ -834,16 +835,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Si el operario de KDS seleccionó Pulpa de Rescate para este ítem o fruta:
         const isUsingRescuePulp = item.selectedSourceType === 'pulpa_rescate';
-        const getEffectiveIngredientId = (origId: string) => {
+        const getEffectiveIngredientAndQty = (origId: string, origQty: number) => {
           const fruitSelection = item.selectedFruitSources?.[origId];
           const usePulp = fruitSelection !== undefined ? fruitSelection === 'pulpa_rescate' : isUsingRescuePulp;
-          if (!usePulp) return origId;
-          if (origId === 'ing-papaya' || origId.includes('papaya')) return 'ing-pulpa-papaya';
-          if (origId === 'ing-fresa' || origId.includes('fresa')) return 'ing-pulpa-fresa';
-          if (origId === 'ing-mango' || origId.includes('mango')) return 'ing-pulpa-mango';
-          if (origId === 'ing-pina' || origId.includes('pina') || origId.includes('piña')) return 'ing-pulpa-pina';
-          // Si la fruta no tiene pulpa específica (ej. plátano), se usa fresca
-          return origId;
+          if (!usePulp) return { targetId: origId, quantity: origQty };
+
+          if (origId === 'sub-mix-surtido-fresco' || origId.includes('surtid')) {
+            return { targetId: 'ing-pulpa-mixta', quantity: 0.150 };
+          }
+          if (origId === 'sub-porcion-mango-fresco' || origId === 'ing-mango' || origId.includes('mango')) {
+            return { targetId: 'ing-pulpa-mango', quantity: 0.180 };
+          }
+          if (origId === 'sub-porcion-fresa-limpia' || origId === 'ing-fresa' || origId.includes('fresa')) {
+            return { targetId: 'ing-pulpa-fresa', quantity: 0.150 };
+          }
+          if (origId === 'sub-porcion-papaya-limpia' || origId === 'ing-papaya' || origId.includes('papaya')) {
+            return { targetId: 'ing-pulpa-papaya', quantity: 0.150 };
+          }
+          if (origId === 'sub-porcion-pina-limpia' || origId === 'ing-pina' || origId.includes('pina') || origId.includes('piña')) {
+            return { targetId: 'ing-pulpa-pina', quantity: 0.150 };
+          }
+          return { targetId: origId, quantity: origQty };
         };
 
         if (item.isCombo && item.comboItems) {
@@ -852,7 +864,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const prod = allProducts.find(p => p.id === ci.productId);
             if (prod) {
               prod.recipeBom.forEach(bom => {
-                const targetIngId = getEffectiveIngredientId(bom.ingredientId);
+                const { targetId: targetIngId, quantity: effectiveQty } = getEffectiveIngredientAndQty(bom.ingredientId, bom.quantity);
                 const ing = updated.find(i => i.id === targetIngId);
                 const isItemDisposable = bom.isDisposable || ing?.itemType === 'descartable';
                 if (isItemDisposable && !enableDisposables) {
@@ -862,13 +874,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (hasSinAzucar && isSugar) {
                   return;
                 }
-                applyDeduction(targetIngId, bom.quantity * ci.quantity * item.quantity);
+                applyDeduction(targetIngId, effectiveQty * ci.quantity * item.quantity);
               });
             }
           });
         } else {
           item.recipeBom.forEach(bom => {
-            const targetIngId = getEffectiveIngredientId(bom.ingredientId);
+            const { targetId: targetIngId, quantity: effectiveQty } = getEffectiveIngredientAndQty(bom.ingredientId, bom.quantity);
             const ing = updated.find(i => i.id === targetIngId);
             const isItemDisposable = bom.isDisposable || ing?.itemType === 'descartable';
             if (isItemDisposable && !enableDisposables) {
@@ -878,7 +890,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (hasSinAzucar && isSugar) {
               return;
             }
-            applyDeduction(targetIngId, bom.quantity * item.quantity);
+            applyDeduction(targetIngId, effectiveQty * item.quantity);
           });
         }
 
@@ -1625,6 +1637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
 
+      saveIngredients(updated).catch(() => {});
       return updated;
     });
 
@@ -1647,6 +1660,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProductionOrders(prev => {
       const next = [op, ...prev];
       localStorage.setItem('erp_production_orders', JSON.stringify(next));
+      saveProductionOrder(op).catch(() => {});
       return next;
     });
   };
