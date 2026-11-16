@@ -662,3 +662,4 @@ const fileContent = `import type { MenuConfig } from '../types';\n\nexport const
 fs.writeFileSync(path.resolve('src/data/menuConfig.ts'), fileContent, 'utf-8');
 
 console.log('✓ Menú completo de Frappés, Smoothies y Premezclas actualizado en SQLite y src/data/menuConfig.ts');
+

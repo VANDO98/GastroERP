@@ -67,3 +67,4 @@ newIngredients.forEach(s => {
 });
 
 console.log(`✓ ${newIngredients.length} insumos y premezclas insertados en SQLite`);
+

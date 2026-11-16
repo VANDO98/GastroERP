@@ -143,7 +143,7 @@ export function createApiRouter(io: Server) {
     }
   });
 
-  // 4. Actualizar insumos completos o lote
+  // 4. Actualizar insumos completos o lote (persistencia estricta en SQLite)
   router.post('/ingredients', (req, res) => {
     try {
       const ingredients = req.body as any[];
@@ -154,6 +154,13 @@ export function createApiRouter(io: Server) {
       `);
 
       const tx = db.transaction(() => {
+        const currentIds = ingredients.map(i => i.id);
+        if (currentIds.length > 0) {
+          const placeholders = currentIds.map(() => '?').join(',');
+          db.prepare(`DELETE FROM ingredients WHERE id NOT IN (${placeholders})`).run(...currentIds);
+        } else {
+          db.prepare('DELETE FROM ingredients').run();
+        }
         ingredients.forEach(ing => {
           stmt.run(
             ing.id,
@@ -365,6 +372,140 @@ export function createApiRouter(io: Server) {
 
       io.emit('production_order:created', op);
       res.json({ success: true, order: op });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.delete('/production-orders/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      db.prepare('DELETE FROM production_orders WHERE id = ?').run(id);
+      io.emit('production_order:deleted', id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 11. Configuración de Mesas del Local
+  router.post('/tables-config', (req, res) => {
+    try {
+      const tablesConfig = req.body;
+      db.prepare('INSERT OR REPLACE INTO tables_config (id, data, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)').run(
+        'current',
+        JSON.stringify(tablesConfig)
+      );
+      io.emit('tables_config:updated', tablesConfig);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 12. Maestro de Toppings y Adicionales
+  router.post('/toppings-master', (req, res) => {
+    try {
+      const toppings = req.body as any[];
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO toppings_master 
+        (id, name, category, price, cost, data, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      `);
+      const tx = db.transaction(() => {
+        const ids = toppings.map(t => t.id);
+        if (ids.length > 0) {
+          const ph = ids.map(() => '?').join(',');
+          db.prepare(`DELETE FROM toppings_master WHERE id NOT IN (${ph})`).run(...ids);
+        } else {
+          db.prepare('DELETE FROM toppings_master').run();
+        }
+        toppings.forEach(t => {
+          stmt.run(t.id, t.name, t.category || '', t.price || 0, t.cost || 0, JSON.stringify(t));
+        });
+      });
+      tx();
+      io.emit('toppings:updated', toppings);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 13. Órdenes de Compra (OC)
+  router.post('/purchase-orders', (req, res) => {
+    try {
+      const orders = req.body as any[];
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO purchase_orders 
+        (id, order_number, supplier_id, supplier_name, status, total, data, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const tx = db.transaction(() => {
+        orders.forEach(po => {
+          stmt.run(
+            po.id,
+            po.poNumber || po.orderNumber || '',
+            po.supplierId || '',
+            po.supplierName || '',
+            po.status || 'borrador',
+            po.total || 0,
+            JSON.stringify(po),
+            po.createdAt || new Date().toISOString()
+          );
+        });
+      });
+      tx();
+      io.emit('purchase_orders:updated', orders);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 14. Combos y Promociones
+  router.post('/combos', (req, res) => {
+    try {
+      const combos = req.body as any[];
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO combos 
+        (id, sku, name, short_name, price, data, is_active, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const tx = db.transaction(() => {
+        combos.forEach(c => {
+          stmt.run(
+            c.id,
+            c.sku || '',
+            c.name,
+            c.shortName || '',
+            c.price,
+            JSON.stringify(c),
+            c.isActive ? 1 : 0,
+            c.createdAt || new Date().toISOString()
+          );
+        });
+      });
+      tx();
+      io.emit('combos:updated', combos);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 15. Categorías personalizadas
+  router.post('/custom-categories', (req, res) => {
+    try {
+      const categories = req.body as string[];
+      const stmt = db.prepare('INSERT OR REPLACE INTO custom_categories (name) VALUES (?)');
+      const tx = db.transaction(() => {
+        db.prepare('DELETE FROM custom_categories').run();
+        categories.forEach(name => stmt.run(name));
+      });
+      tx();
+      io.emit('custom_categories:updated', categories);
+      res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

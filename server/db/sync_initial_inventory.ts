@@ -24,3 +24,4 @@ const content = `import type { Ingredient } from '../types';\n\nexport const ini
 
 fs.writeFileSync(path.resolve('src/data/initialInventory.ts'), content, 'utf-8');
 console.log(`✓ ${ingredients.length} insumos sincronizados en src/data/initialInventory.ts`);
+

@@ -45,7 +45,13 @@ import {
   saveInvoice,
   saveSuppliers,
   saveWaste,
-  saveProductionOrder
+  saveProductionOrder,
+  deleteProductionOrderApi,
+  saveTablesConfig,
+  saveToppingsMaster,
+  savePurchaseOrders,
+  saveCombos,
+  saveCustomCategories
 } from '../services/apiService';
 
 
@@ -257,16 +263,20 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Limpieza defensiva de claves obsoletas si existiesen
+  // Purgar de forma estricta claves de negocio en localStorage
+  // Toda la información reside y se lee exclusivamente de la base de datos permanente SQLite
   useEffect(() => {
-    const isCleaned = localStorage.getItem('erp_db_v2_cleaned');
-    if (!isCleaned) {
-      localStorage.removeItem('erp_invoices');
-      localStorage.setItem('erp_db_v2_cleaned', 'true');
-    }
+    const businessKeys = [
+      'erp_menu_config', 'erp_ingredients', 'erp_tables', 'erp_orders',
+      'erp_detailed_invoices', 'erp_purchases', 'erp_batches', 'erp_wastes',
+      'erp_suppliers', 'erp_combos', 'erp_custom_ingredient_categories',
+      'erp_company_config', 'erp_purchase_orders', 'erp_toppings_master',
+      'erp_tables_config', 'erp_production_orders', 'erp_invoices', 'erp_db_v2_cleaned'
+    ];
+    businessKeys.forEach(k => localStorage.removeItem(k));
   }, []);
 
-  // 0. Tema visual
+  // 0. Tema visual (única preferencia local de UI permitida)
   const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('erp_theme_mode') as 'dark' | 'light') || 'dark';
   });
@@ -279,124 +289,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // 1. Estado de Menú
-  const [menuConfig, setMenuConfig] = useState<MenuConfig>(() => {
-    const saved = localStorage.getItem('erp_menu_config');
-    return saved ? JSON.parse(saved) : initialMenuConfig;
-  });
-
-  // 2. Estado de Inventario con lotes FIFO
-  const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
-    const saved = localStorage.getItem('erp_ingredients');
-    return saved ? JSON.parse(saved) : initialIngredients;
-  });
-
-  // 3. Mesas Abiertas
-  const [tables, setTables] = useState<TableOrder[]>(() => {
-    const saved = localStorage.getItem('erp_tables');
-    if (!saved) return defaultTables;
-    try {
-      const parsed: TableOrder[] = JSON.parse(saved);
-      return parsed.map(t => ({
-        ...t,
-        manualDisposables: t.manualDisposables || []
-      }));
-    } catch {
-      return defaultTables;
-    }
-  });
-
+  // 1. Estados en memoria: Solo el esqueleto inicial, 100% alimentado por SQLite en fetchBootstrap
+  const [menuConfig, setMenuConfig] = useState<MenuConfig>(initialMenuConfig);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [tables, setTables] = useState<TableOrder[]>(defaultTables);
   const [activeTableId, setActiveTableId] = useState<string>('mesa-1');
-
-  // 4. Órdenes Históricas
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('erp_orders');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // 5. Facturas Detalladas ERP (Base de Datos Unificada)
-  const [detailedInvoices, setDetailedInvoices] = useState<DetailedPurchaseInvoice[]>(() => {
-    const saved = localStorage.getItem('erp_detailed_invoices');
-    return saved ? JSON.parse(saved) : initialDetailedInvoices;
-  });
-
-  // 6. Compras Rápidas Móvil
-  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => {
-    const saved = localStorage.getItem('erp_purchases');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // 7. Batches y Mermas
-  const [batches, setBatches] = useState<BatchProduction[]>(() => {
-    const saved = localStorage.getItem('erp_batches');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [wastes, setWastes] = useState<WasteRecord[]>(() => {
-    const saved = localStorage.getItem('erp_wastes');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // 8. Proveedores
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
-    const saved = localStorage.getItem('erp_suppliers');
-    return saved ? JSON.parse(saved) : initialSuppliers;
-  });
-
-  // 9. Combos & Promociones
-  const [combos, setCombos] = useState<Combo[]>(() => {
-    const saved = localStorage.getItem('erp_combos');
-    return saved ? JSON.parse(saved) : initialCombos;
-  });
-
-  // 10. Categorías Personalizadas de Insumos
-  const [customIngredientCategories, setCustomIngredientCategories] = useState<string[]>(() => {
-    const saved = localStorage.getItem('erp_custom_ingredient_categories');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  // 11. Datos de Empresa (para membrete de OC)
-  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(() => {
-    const saved = localStorage.getItem('erp_company_config');
-    return saved ? JSON.parse(saved) : initialCompanyConfig;
-  });
-
-  // 12. Órdenes de Compra (OC)
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(() => {
-    const saved = localStorage.getItem('erp_purchase_orders');
-    return saved ? JSON.parse(saved) : initialPurchaseOrders;
-  });
-
-  // 13. Catálogo Maestro de Toppings (con fusión automática si faltan predeterminados)
-  const [toppingsMaster, setToppingsMaster] = useState<ToppingMaster[]>(() => {
-    const saved = localStorage.getItem('erp_toppings_master');
-    if (!saved) return initialToppingsMaster;
-    try {
-      const parsed: ToppingMaster[] = JSON.parse(saved);
-      const existingIds = new Set(parsed.map(t => t.id));
-      const missing = initialToppingsMaster.filter(t => !existingIds.has(t.id));
-      return [...parsed, ...missing];
-    } catch {
-      return initialToppingsMaster;
-    }
-  });
-
-  // 14. Configuración de Mesas del Local
-  const [tablesConfig, setTablesConfig] = useState<TableConfig[]>(() => {
-    const saved = localStorage.getItem('erp_tables_config');
-    return saved ? JSON.parse(saved) : initialTablesConfig;
-  });
-
-  // 15. Órdenes de Producción (Preparar Recetas / Subrecetas)
-  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>(() => {
-    const saved = localStorage.getItem('erp_production_orders');
-    return saved ? JSON.parse(saved) : initialProductionOrders;
-  });
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [detailedInvoices, setDetailedInvoices] = useState<DetailedPurchaseInvoice[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
+  const [batches, setBatches] = useState<BatchProduction[]>([]);
+  const [wastes, setWastes] = useState<WasteRecord[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [combos, setCombos] = useState<Combo[]>([]);
+  const [customIngredientCategories, setCustomIngredientCategories] = useState<string[]>([]);
+  const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(initialCompanyConfig);
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [toppingsMaster, setToppingsMaster] = useState<ToppingMaster[]>([]);
+  const [tablesConfig, setTablesConfig] = useState<TableConfig[]>([]);
+  const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
 
   // Bandera para evitar retransmitir al servidor lo que acabamos de recibir por WebSocket
   const isIncomingSocketUpdate = React.useRef(false);
 
-  // Sincronización Inicial con Servidor Central (Base de Datos SQLite)
+  // Sincronización Inicial con Servidor Central (Base de Datos SQLite permanente)
   useEffect(() => {
     let isMounted = true;
     fetchBootstrap()
@@ -406,7 +321,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.companyConfig) setCompanyConfig(data.companyConfig);
         if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
         if (data.menuConfig) setMenuConfig(data.menuConfig);
-        if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
+        if (data.ingredients) setIngredients(data.ingredients);
         if (data.activeTables && data.activeTables.length > 0) setTables(data.activeTables);
         if (data.orders) setOrders(data.orders);
         if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
@@ -420,7 +335,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
       })
       .catch(err => {
-        console.warn('[Sync] Servidor offline o no alcanzable, usando respaldo local en memoria/localStorage:', err.message);
+        console.warn('[Sync] Conexión inicial con SQLite:', err.message);
       });
 
     // Escuchar eventos en vivo emitidos desde otros dispositivos en la red local
@@ -457,11 +372,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
+    const handleProductionCreated = (op: ProductionOrder) => {
+      isIncomingSocketUpdate.current = true;
+      setProductionOrders(prev => [op, ...prev.filter(p => p.id !== op.id)]);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
+    const handleProductionDeleted = (id: string) => {
+      isIncomingSocketUpdate.current = true;
+      setProductionOrders(prev => prev.filter(p => p.id !== id));
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
+    const handleToppingsUpdated = (tops: ToppingMaster[]) => {
+      isIncomingSocketUpdate.current = true;
+      setToppingsMaster(tops);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
+    const handleTablesConfigUpdated = (cfg: TableConfig[]) => {
+      isIncomingSocketUpdate.current = true;
+      setTablesConfig(cfg);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
+    const handleSuppliersUpdated = (sups: Supplier[]) => {
+      isIncomingSocketUpdate.current = true;
+      setSuppliers(sups);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
     socket.on('tables:updated', handleTablesUpdated);
     socket.on('order:created', handleOrderCreated);
     socket.on('ingredients:updated', handleIngredientsUpdated);
     socket.on('menu:updated', handleMenuUpdated);
     socket.on('company_config:updated', handleCompanyUpdated);
+    socket.on('production_order:created', handleProductionCreated);
+    socket.on('production_order:deleted', handleProductionDeleted);
+    socket.on('toppings:updated', handleToppingsUpdated);
+    socket.on('tables_config:updated', handleTablesConfigUpdated);
+    socket.on('suppliers:updated', handleSuppliersUpdated);
 
     return () => {
       isMounted = false;
@@ -470,73 +420,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       socket.off('ingredients:updated', handleIngredientsUpdated);
       socket.off('menu:updated', handleMenuUpdated);
       socket.off('company_config:updated', handleCompanyUpdated);
+      socket.off('production_order:created', handleProductionCreated);
+      socket.off('production_order:deleted', handleProductionDeleted);
+      socket.off('toppings:updated', handleToppingsUpdated);
+      socket.off('tables_config:updated', handleTablesConfigUpdated);
+      socket.off('suppliers:updated', handleSuppliersUpdated);
     };
   }, []);
-
-  // Sincronizaciones locales con localStorage (como respaldo de solo lectura)
-  useEffect(() => {
-    localStorage.setItem('erp_custom_ingredient_categories', JSON.stringify(customIngredientCategories));
-  }, [customIngredientCategories]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_company_config', JSON.stringify(companyConfig));
-  }, [companyConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_purchase_orders', JSON.stringify(purchaseOrders));
-  }, [purchaseOrders]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_toppings_master', JSON.stringify(toppingsMaster));
-  }, [toppingsMaster]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_tables_config', JSON.stringify(tablesConfig));
-  }, [tablesConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_production_orders', JSON.stringify(productionOrders));
-  }, [productionOrders]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_menu_config', JSON.stringify(menuConfig));
-  }, [menuConfig]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_ingredients', JSON.stringify(ingredients));
-  }, [ingredients]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_tables', JSON.stringify(tables));
-  }, [tables]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_orders', JSON.stringify(orders));
-  }, [orders]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_detailed_invoices', JSON.stringify(detailedInvoices));
-  }, [detailedInvoices]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_purchases', JSON.stringify(purchases));
-  }, [purchases]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_batches', JSON.stringify(batches));
-  }, [batches]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_wastes', JSON.stringify(wastes));
-  }, [wastes]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_suppliers', JSON.stringify(suppliers));
-  }, [suppliers]);
-
-  useEffect(() => {
-    localStorage.setItem('erp_combos', JSON.stringify(combos));
-  }, [combos]);
 
 
   // Gestión de Insumos
@@ -1433,7 +1323,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateCompanyConfig = (updated: Partial<CompanyConfig>) => {
     setCompanyConfig(prev => {
       const next = { ...prev, ...updated };
-      localStorage.setItem('erp_company_config', JSON.stringify(next));
       saveCompanyConfig(next).catch(() => {});
       return next;
     });
@@ -1448,7 +1337,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setPurchaseOrders(prev => {
       const next = [newPo, ...prev];
-      localStorage.setItem('erp_purchase_orders', JSON.stringify(next));
+      savePurchaseOrders(next).catch(() => {});
       return next;
     });
   };
@@ -1460,7 +1349,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     setPurchaseOrders(prev => {
       const next = prev.map(p => p.id === poId ? { ...p, status, ...extraUpdates } : p);
-      localStorage.setItem('erp_purchase_orders', JSON.stringify(next));
+      savePurchaseOrders(next).catch(() => {});
       return next;
     });
   };
@@ -1521,7 +1410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setPurchaseOrders(prev => {
       const next = prev.map(p => p.id === poId ? { ...p, status: 'recibida' as const, convertedToInvoiceId: invoiceId } : p);
-      localStorage.setItem('erp_purchase_orders', JSON.stringify(next));
+      savePurchaseOrders(next).catch(() => {});
       return next;
     });
   };
@@ -1534,7 +1423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setToppingsMaster(prev => {
       const next = [...prev, newTop];
-      localStorage.setItem('erp_toppings_master', JSON.stringify(next));
+      saveToppingsMaster(next).catch(() => {});
       return next;
     });
   };
@@ -1542,7 +1431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateToppingMaster = (updated: ToppingMaster) => {
     setToppingsMaster(prev => {
       const next = prev.map(t => t.id === updated.id ? updated : t);
-      localStorage.setItem('erp_toppings_master', JSON.stringify(next));
+      saveToppingsMaster(next).catch(() => {});
       return next;
     });
   };
@@ -1550,7 +1439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteToppingMaster = (id: string) => {
     setToppingsMaster(prev => {
       const next = prev.filter(t => t.id !== id);
-      localStorage.setItem('erp_toppings_master', JSON.stringify(next));
+      saveToppingsMaster(next).catch(() => {});
       return next;
     });
   };
@@ -1561,7 +1450,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newConfig: TableConfig = { ...tblData, id: newId };
     setTablesConfig(prev => {
       const next = [...prev, newConfig];
-      localStorage.setItem('erp_tables_config', JSON.stringify(next));
+      saveTablesConfig(next).catch(() => {});
       return next;
     });
     setTables(prev => [
@@ -1581,7 +1470,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateTableConfig = (tbl: TableConfig) => {
     setTablesConfig(prev => {
       const next = prev.map(t => t.id === tbl.id ? tbl : t);
-      localStorage.setItem('erp_tables_config', JSON.stringify(next));
+      saveTablesConfig(next).catch(() => {});
       return next;
     });
     setTables(prev =>
@@ -1592,7 +1481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteTableConfig = (id: string) => {
     setTablesConfig(prev => {
       const next = prev.filter(t => t.id !== id);
-      localStorage.setItem('erp_tables_config', JSON.stringify(next));
+      saveTablesConfig(next).catch(() => {});
       return next;
     });
     setTables(prev => prev.filter(t => t.tableId !== id));
@@ -1659,7 +1548,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 4. Guardar orden de producción
     setProductionOrders(prev => {
       const next = [op, ...prev];
-      localStorage.setItem('erp_production_orders', JSON.stringify(next));
       saveProductionOrder(op).catch(() => {});
       return next;
     });
@@ -1668,7 +1556,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateProductionOrderStatus = (id: string, status: ProductionOrderStatus) => {
     setProductionOrders(prev => {
       const next = prev.map(p => p.id === id ? { ...p, status } : p);
-      localStorage.setItem('erp_production_orders', JSON.stringify(next));
+      const updatedOp = next.find(p => p.id === id);
+      if (updatedOp) saveProductionOrder(updatedOp).catch(() => {});
       return next;
     });
   };
@@ -1676,7 +1565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteProductionOrder = (id: string) => {
     setProductionOrders(prev => {
       const next = prev.filter(p => p.id !== id);
-      localStorage.setItem('erp_production_orders', JSON.stringify(next));
+      deleteProductionOrderApi(id).catch(() => {});
       return next;
     });
   };

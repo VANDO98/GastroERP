@@ -93,3 +93,49 @@ export async function saveProductionOrder(op: any) {
   });
 }
 
+export async function deleteProductionOrderApi(id: string) {
+  return fetch(`${API_URL}/production-orders/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function saveTablesConfig(tablesConfig: any) {
+  return fetch(`${API_URL}/tables-config`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tablesConfig)
+  });
+}
+
+export async function saveToppingsMaster(toppings: any[]) {
+  return fetch(`${API_URL}/toppings-master`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(toppings)
+  });
+}
+
+export async function savePurchaseOrders(orders: any[]) {
+  return fetch(`${API_URL}/purchase-orders`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(orders)
+  });
+}
+
+export async function saveCombos(combos: any[]) {
+  return fetch(`${API_URL}/combos`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(combos)
+  });
+}
+
+export async function saveCustomCategories(categories: string[]) {
+  return fetch(`${API_URL}/custom-categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(categories)
+  });
+}
+
