@@ -33,6 +33,18 @@ import { initialPurchaseOrders } from '../data/initialPurchaseOrders';
 import { initialToppingsMaster } from '../data/initialToppingsMaster';
 import { initialTablesConfig } from '../data/initialTablesConfig';
 import { initialProductionOrders } from '../data/initialProductionOrders';
+import {
+  socket,
+  fetchBootstrap,
+  saveCompanyConfig,
+  saveMenuConfig,
+  saveIngredients,
+  saveTables,
+  saveOrder,
+  saveInvoice,
+  saveSuppliers,
+  saveWaste
+} from '../services/apiService';
 
 
 // Mesas iniciales del local
@@ -379,35 +391,110 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : initialProductionOrders;
   });
 
-  // Sincronizaciones con localStorage
+  // Sincronización Inicial con Servidor Central (Base de Datos SQLite)
+  useEffect(() => {
+    let isMounted = true;
+    fetchBootstrap()
+      .then(data => {
+        if (!isMounted || !data) return;
+        if (data.companyConfig) setCompanyConfig(data.companyConfig);
+        if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
+        if (data.menuConfig) setMenuConfig(data.menuConfig);
+        if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
+        if (data.activeTables && data.activeTables.length > 0) setTables(data.activeTables);
+        if (data.orders) setOrders(data.orders);
+        if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
+        if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
+        if (data.toppingsMaster) setToppingsMaster(data.toppingsMaster);
+        if (data.combos) setCombos(data.combos);
+        if (data.suppliers) setSuppliers(data.suppliers);
+        if (data.wastes) setWastes(data.wastes);
+        if (data.productionOrders) setProductionOrders(data.productionOrders);
+        if (data.customCategories) setCustomIngredientCategories(data.customCategories);
+      })
+      .catch(err => {
+        console.warn('[Sync] Servidor offline o no alcanzable, usando respaldo local en memoria/localStorage:', err.message);
+      });
+
+    // Escuchar eventos en vivo emitidos desde otros dispositivos en la red local
+    const handleTablesUpdated = (updatedTables: TableOrder[]) => {
+      setTables(updatedTables);
+    };
+
+    const handleOrderCreated = (newOrder: Order) => {
+      setOrders(prev => {
+        if (prev.some(o => o.id === newOrder.id)) return prev;
+        return [newOrder, ...prev];
+      });
+    };
+
+    const handleIngredientsUpdated = (updatedIngs: Ingredient[]) => {
+      setIngredients(updatedIngs);
+    };
+
+    const handleMenuUpdated = (updatedMenu: MenuConfig) => {
+      setMenuConfig(updatedMenu);
+    };
+
+    const handleCompanyUpdated = (updatedConfig: CompanyConfig) => {
+      setCompanyConfig(updatedConfig);
+    };
+
+    socket.on('tables:updated', handleTablesUpdated);
+    socket.on('order:created', handleOrderCreated);
+    socket.on('ingredients:updated', handleIngredientsUpdated);
+    socket.on('menu:updated', handleMenuUpdated);
+    socket.on('company_config:updated', handleCompanyUpdated);
+
+    return () => {
+      isMounted = false;
+      socket.off('tables:updated', handleTablesUpdated);
+      socket.off('order:created', handleOrderCreated);
+      socket.off('ingredients:updated', handleIngredientsUpdated);
+      socket.off('menu:updated', handleMenuUpdated);
+      socket.off('company_config:updated', handleCompanyUpdated);
+    };
+  }, []);
+
+  // Sincronizaciones con localStorage y persistencia hacia el Servidor Central
   useEffect(() => {
     localStorage.setItem('erp_custom_ingredient_categories', JSON.stringify(customIngredientCategories));
   }, [customIngredientCategories]);
+
   useEffect(() => {
     localStorage.setItem('erp_company_config', JSON.stringify(companyConfig));
+    saveCompanyConfig(companyConfig).catch(() => {});
   }, [companyConfig]);
+
   useEffect(() => {
     localStorage.setItem('erp_purchase_orders', JSON.stringify(purchaseOrders));
   }, [purchaseOrders]);
+
   useEffect(() => {
     localStorage.setItem('erp_toppings_master', JSON.stringify(toppingsMaster));
   }, [toppingsMaster]);
+
   useEffect(() => {
     localStorage.setItem('erp_tables_config', JSON.stringify(tablesConfig));
   }, [tablesConfig]);
+
   useEffect(() => {
     localStorage.setItem('erp_production_orders', JSON.stringify(productionOrders));
   }, [productionOrders]);
+
   useEffect(() => {
     localStorage.setItem('erp_menu_config', JSON.stringify(menuConfig));
+    saveMenuConfig(menuConfig).catch(() => {});
   }, [menuConfig]);
 
   useEffect(() => {
     localStorage.setItem('erp_ingredients', JSON.stringify(ingredients));
+    saveIngredients(ingredients).catch(() => {});
   }, [ingredients]);
 
   useEffect(() => {
     localStorage.setItem('erp_tables', JSON.stringify(tables));
+    saveTables(tables).catch(() => {});
   }, [tables]);
 
   useEffect(() => {
@@ -432,6 +519,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     localStorage.setItem('erp_suppliers', JSON.stringify(suppliers));
+    saveSuppliers(suppliers).catch(() => {});
   }, [suppliers]);
 
   useEffect(() => {

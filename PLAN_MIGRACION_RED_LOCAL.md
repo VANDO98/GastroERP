@@ -99,3 +99,4 @@ flowchart LR
 | **Comandas a Cocina** | No viajan entre dispositivos | Evento Socket.io push instantáneo a `KdsModule` |
 | **Mesas** | Estado aislado por pantalla | Sincronización en vivo del estado de mesas |
 | **Respaldo** | Se pierde si se limpia caché | Copia de archivo `database.sqlite` |
+
