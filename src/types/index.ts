@@ -129,7 +129,7 @@ export interface OrderItem {
   notes?: string;
   itemTotal: number;
   recipeBom: BomItem[];
-  kitchenStatus?: 'pendiente' | 'entregado'; // Discriminación KDS
+  kitchenStatus?: 'pendiente' | 'en_preparacion' | 'entregado'; // Discriminación KDS y ciclo de envío a barra
   selectedSourceType?: 'fruta_fresca' | 'pulpa_rescate'; // Control operativo en KDS Barra
   selectedFruitSources?: Record<string, 'fruta_fresca' | 'pulpa_rescate'>; // Selección individual por fruta en bebidas mixtas
   addedAt?: string;

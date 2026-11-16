@@ -689,7 +689,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (tbl.tableId === tableId) {
           const updatedItems: OrderItem[] = tbl.items.map(item => ({
             ...item,
-            kitchenStatus: item.kitchenStatus === 'entregado' ? 'entregado' : 'pendiente'
+            kitchenStatus: item.kitchenStatus === 'entregado' ? 'entregado' : 'en_preparacion'
           }));
 
           return {

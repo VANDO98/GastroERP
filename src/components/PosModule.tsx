@@ -312,7 +312,12 @@ export const PosModule: React.FC = () => {
     } catch {}
   };
 
-  const pendingItemsCount = activeTable.items.filter(i => i.kitchenStatus !== 'entregado').length;
+  // Ítems pendientes que aún no han sido enviados a barra (kitchenStatus === 'pendiente' o undefined)
+  const unsentItemsCount = activeTable.items.filter(i => !i.kitchenStatus || i.kitchenStatus === 'pendiente').length;
+  // Ítems en preparación activa en barra
+  const inPrepItemsCount = activeTable.items.filter(i => i.kitchenStatus === 'en_preparacion').length;
+  // El botón solo se activa si hay productos y al menos uno está pendiente de envío a barra
+  const canSendToKitchen = unsentItemsCount > 0;
   return (
     <div className={'flex-1 flex flex-col h-[calc(100vh-62px)] overflow-hidden ' + (isLight ? 'bg-slate-100 text-slate-900 font-sans' : 'bg-slate-950 text-slate-100')}>
       <div className={'px-3 py-2 border-b flex items-center gap-2 overflow-x-auto no-scrollbar ' + (isLight ? 'bg-white border-slate-300' : 'bg-slate-900/90 border-slate-800')}>
@@ -725,15 +730,25 @@ export const PosModule: React.FC = () => {
             </div>
 
             <button
-              disabled={activeTable.items.length === 0}
+              disabled={!canSendToKitchen}
               onClick={handleSendToKitchen}
-              className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-extrabold text-xs shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-1.5 transition-all"
+              className={`w-full py-2.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all ${
+                canSendToKitchen
+                  ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-600/30 cursor-pointer active:scale-95'
+                  : 'bg-slate-300 dark:bg-slate-800 text-slate-500 dark:text-slate-400 opacity-60 cursor-not-allowed shadow-none'
+              }`}
             >
               <Send className="w-4 h-4" />
               <span>
                 {activeTable.status === 'en_preparacion'
-                  ? pendingItemsCount > 0 ? ('ENVIAR ' + pendingItemsCount + ' NUEVOS ÍTEMS A BARRA') : 'EN PREPARACIÓN EN BARRA (<3 MIN)'
-                  : 'ENVIAR COMANDA A BARRA'}
+                  ? unsentItemsCount > 0
+                    ? `ENVIAR ${unsentItemsCount} NUEVOS ÍTEMS A BARRA`
+                    : 'EN PREPARACIÓN EN BARRA (<3 MIN)'
+                  : activeTable.items.length === 0
+                  ? 'SIN ÍTEMS EN COMANDA'
+                  : unsentItemsCount > 0
+                  ? 'ENVIAR COMANDA A BARRA'
+                  : 'ENVIADO A BARRA'}
               </span>
             </button>
 
