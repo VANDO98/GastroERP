@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Plus, Minus, Trash2, CheckCircle2, CreditCard, Banknote, QrCode, User, Coffee, Send, Package, Sparkles, AlertTriangle
+  Plus, Minus, Trash2, CheckCircle2, CreditCard, Banknote, QrCode, User, Coffee, Send, Package, Sparkles, AlertTriangle,
+  ArrowLeft, Eye, Clock, UtensilsCrossed, ChevronRight, ShoppingBag, X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
-import type { Product, QuickModifier, OrderItem, OrderItemModifier, ManualDisposable, Combo, BomItem } from '../types';
+import type { Product, QuickModifier, OrderItem, OrderItemModifier, ManualDisposable, Combo, BomItem, TableOrder } from '../types';
 
 export const PosModule: React.FC = () => {
   const {
@@ -15,6 +16,11 @@ export const PosModule: React.FC = () => {
   } = useApp();
 
   const isLight = themeMode === 'light';
+  // Modo de visualización: 'tables' (Salón de mesas con tarjetas grandes) | 'order' (Toma de pedidos en mesa)
+  const [posViewMode, setPosViewMode] = useState<'tables' | 'order'>('tables');
+  // Modal de inspección rápida de comanda desde la tarjeta de mesa
+  const [inspectingTable, setInspectingTable] = useState<TableOrder | null>(null);
+
   const activeTable = tables.find(t => t.tableId === activeTableId) || tables[0];
   const [selectedLineId, setSelectedLineId] = useState<'linea-fria' | 'linea-caliente' | 'combos'>('linea-fria');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
@@ -302,6 +308,8 @@ export const PosModule: React.FC = () => {
   const handleSendToKitchen = () => {
     if (activeTable.items.length === 0) return;
     sendTableToKitchen(activeTable.tableId);
+    // Retorno automático al salón de mesas tras enviar la comanda
+    setPosViewMode('tables');
   };
 
   const handleCheckoutTable = (paymentMethod: 'efectivo' | 'yape_plin' | 'tarjeta') => {
@@ -310,6 +318,8 @@ export const PosModule: React.FC = () => {
     try {
       confetti({ particleCount: 50, spread: 70, origin: { y: 0.85 } });
     } catch {}
+    // Retorno automático al salón de mesas tras cobrar
+    setPosViewMode('tables');
   };
 
   // Ítems pendientes que aún no han sido enviados a barra (kitchenStatus === 'pendiente' o undefined)
@@ -320,93 +330,333 @@ export const PosModule: React.FC = () => {
   const canSendToKitchen = unsentItemsCount > 0;
   return (
     <div className={'flex-1 flex flex-col h-[calc(100vh-62px)] overflow-hidden ' + (isLight ? 'bg-slate-100 text-slate-900 font-sans' : 'bg-slate-950 text-slate-100')}>
-      <div className={'px-3 py-2 border-b flex items-center gap-2 overflow-x-auto no-scrollbar ' + (isLight ? 'bg-white border-slate-300' : 'bg-slate-900/90 border-slate-800')}>
-        <span className={'text-[10px] uppercase font-bold font-mono tracking-wider shrink-0 pl-1 ' + (isLight ? 'text-slate-600' : 'text-slate-400')}>Mesas:</span>
-        {tables.map(tbl => {
-          const isActive = tbl.tableId === activeTableId;
-          const inKitchen = tbl.status === 'en_preparacion';
-          const toPay = tbl.status === 'por_cobrar';
-          const isFree = tbl.status === 'libre';
-          let statusDot = 'bg-emerald-500';
-          if (inKitchen) statusDot = 'bg-cyan-400 animate-pulse';
-          else if (toPay) statusDot = 'bg-purple-400';
-          else if (!isFree) statusDot = 'bg-amber-400';
-
-          return (
-            <button
-              key={tbl.tableId}
-              onClick={() => setActiveTableId(tbl.tableId)}
-              className={'px-3.5 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-all flex items-center gap-2 border ' +
-                (isActive
-                  ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-2 ring-orange-400/50'
-                  : isLight
-                  ? 'bg-white border-slate-300 text-slate-800 hover:bg-slate-100'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:bg-slate-800')}
-            >
-              <span className={'w-2.5 h-2.5 rounded-full ' + statusDot}></span>
-              <span>{tbl.tableName}</span>
-              {tbl.total > 0 && (
-                <span className={'font-mono text-[11px] font-black ' + (isActive ? 'text-white' : isLight ? 'text-emerald-700' : 'text-amber-300')}>
-                  S/{tbl.total.toFixed(0)}
+      
+      {/* ========================================================================= */}
+      {/* MODO 1: MAPA GENERAL DE MESAS EN TARJETAS GRANDES */}
+      {/* ========================================================================= */}
+      {posViewMode === 'tables' && (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 animate-in fade-in">
+          {/* Header y Métricas Rápidas del Salón */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase tracking-wider text-orange-500 font-bold">
+                  Piso de Ventas & Salón
                 </span>
-              )}
-              {tbl.tableId.startsWith('llevar-') && (
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    removeTakeoutTable(tbl.tableId);
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                  {tables.filter(t => t.status === 'libre').length} Libres
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  {tables.filter(t => t.status === 'en_preparacion').length} En Barra
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                  {tables.filter(t => t.status === 'por_cobrar').length} Por Cobrar
+                </span>
+              </div>
+              <h2 className={`text-2xl font-black mt-1 flex items-center gap-2.5 ${
+                isLight ? 'text-slate-900' : 'text-white'
+              }`}>
+                <UtensilsCrossed className="w-6 h-6 text-orange-500" />
+                <span>Salón de Mesas & Barra</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Selecciona una mesa para tomar comanda, consultar consumos o gestionar el cobro inmediato.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const newTableId = addTakeoutTable();
+                  setActiveTableId(newTableId);
+                  setPosViewMode('order');
+                }}
+                className="px-4 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs shadow-lg shadow-cyan-600/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>+ Nuevo Pedido Para Llevar</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cuadrícula de Tarjetas Grandes de Mesas */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            {tables.map(tbl => {
+              const inKitchen = tbl.status === 'en_preparacion';
+              const toPay = tbl.status === 'por_cobrar';
+              const isFree = tbl.status === 'libre';
+              const isTaking = tbl.status === 'en_toma' || (!isFree && !inKitchen && !toPay);
+              const isTakeout = tbl.tableId.startsWith('llevar');
+
+              // Estilos y badges según estado
+              let borderStyle = isLight ? 'border-slate-300 hover:border-emerald-500' : 'border-slate-800 hover:border-emerald-500';
+              let badgeBg = isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+              let statusLabel = 'Libre';
+
+              if (inKitchen) {
+                borderStyle = 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-cyan-500/10 shadow-lg';
+                badgeBg = isLight ? 'bg-cyan-100 text-cyan-800 border-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
+                statusLabel = 'En Preparación';
+              } else if (toPay) {
+                borderStyle = 'border-purple-500 ring-2 ring-purple-500/20 shadow-purple-500/10 shadow-lg';
+                badgeBg = isLight ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+                statusLabel = 'Por Cobrar';
+              } else if (isTaking) {
+                borderStyle = 'border-amber-500 ring-2 ring-amber-500/20 shadow-amber-500/10 shadow-lg';
+                badgeBg = isLight ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+                statusLabel = 'En Toma';
+              }
+
+              return (
+                <div
+                  key={tbl.tableId}
+                  onClick={() => {
+                    setActiveTableId(tbl.tableId);
+                    setPosViewMode('order');
                   }}
-                  className="ml-1 text-slate-400 hover:text-rose-400 p-0.5 rounded-full hover:bg-rose-500/20 text-[10px]"
-                  title="Eliminar este pedido para llevar"
+                  className={`rounded-3xl border p-4.5 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer group relative ${
+                    isLight ? 'bg-white' : 'bg-slate-900/90'
+                  } ${borderStyle}`}
                 >
-                  ✕
+                  {/* Cabecera de la Tarjeta */}
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${
+                          inKitchen ? 'bg-cyan-400 animate-pulse' : toPay ? 'bg-purple-400' : isFree ? 'bg-emerald-500' : 'bg-amber-400'
+                        }`} />
+                        <h3 className={`text-base font-black group-hover:text-orange-500 transition-colors ${
+                          isLight ? 'text-slate-900' : 'text-white'
+                        }`}>
+                          {tbl.tableName}
+                        </h3>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold border ${badgeBg}`}>
+                          {statusLabel}
+                        </span>
+                        {isTakeout && tbl.tableId !== 'llevar' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeTakeoutTable(tbl.tableId);
+                            }}
+                            className="p-1 rounded-full text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+                            title="Eliminar este pedido para llevar"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Subtítulo o nombre de cliente */}
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3 flex items-center justify-between">
+                      <span>{tbl.customerName ? `Cliente: ${tbl.customerName}` : isTakeout ? 'Para Llevar / Empaque' : 'Servicio en Salón'}</span>
+                      {tbl.items.length > 0 && (
+                        <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                          {tbl.items.length} {tbl.items.length === 1 ? 'producto' : 'productos'}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Resumen de ítems si tiene comanda activa */}
+                    {tbl.items.length > 0 ? (
+                      <div className={`p-2.5 rounded-2xl border text-xs mb-3 space-y-1 ${
+                        isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
+                      }`}>
+                        {tbl.items.slice(0, 3).map((item, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-slate-700 dark:text-slate-300">
+                            <span className="truncate pr-1">
+                              <strong className="text-orange-500 font-mono">{item.quantity}x</strong> {item.name}
+                            </span>
+                            <span className="font-mono text-[11px] font-bold text-slate-500">
+                              S/ {item.itemTotal.toFixed(2)}
+                            </span>
+                          </div>
+                        ))}
+                        {tbl.items.length > 3 && (
+                          <div className="text-[10px] text-slate-500 font-bold italic pt-0.5 text-center">
+                            + {tbl.items.length - 3} productos más...
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={`p-3 rounded-2xl border border-dashed text-center text-xs text-slate-400 mb-3 ${
+                        isLight ? 'bg-slate-50/60 border-slate-200' : 'bg-slate-950/30 border-slate-800/60'
+                      }`}>
+                        <Coffee className="w-4 h-4 mx-auto mb-1 opacity-40 text-emerald-500" />
+                        <span>Mesa disponible para comanda</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pie de la Tarjeta con Total y Botones de Acción */}
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80">
+                    <div className="flex items-baseline justify-between mb-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Acumulado:</span>
+                      <span className={`text-xl font-mono font-black ${
+                        tbl.total > 0
+                          ? isLight ? 'text-emerald-700' : 'text-emerald-400'
+                          : 'text-slate-400'
+                      }`}>
+                        S/ {tbl.total.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5 pt-1">
+                      {tbl.items.length > 0 ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInspectingTable(tbl);
+                            }}
+                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border flex items-center justify-center gap-1 transition-all ${
+                              isLight
+                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                            }`}
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>Ver Comanda</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveTableId(tbl.tableId);
+                              setPosViewMode('order');
+                            }}
+                            className="py-1.5 px-2 rounded-xl text-[11px] font-black bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
+                          >
+                            <span>Tomar / Modificar</span>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveTableId(tbl.tableId);
+                            setPosViewMode('order');
+                          }}
+                          className="col-span-2 py-2 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Tomar Pedido</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODO 2: TOMA DE PEDIDOS (CATÁLOGO + COMANDA LATERAL) */}
+      {/* ========================================================================= */}
+      {posViewMode === 'order' && (
+        <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in">
+          {/* Barra Superior de Navegación: Botón Regresar a Mesas + Selector de Mesa Activa */}
+          <div className={'px-3 py-2 border-b flex items-center justify-between gap-2 ' + (isLight ? 'bg-white border-slate-300' : 'bg-slate-900/90 border-slate-800')}>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setPosViewMode('tables')}
+                className={`px-3 py-1.5 rounded-xl border font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isLight
+                    ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300 shadow-sm'
+                    : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
+                }`}
+              >
+                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                <span>← Volver a Salón de Mesas</span>
+              </button>
+
+              <div className="hidden sm:flex items-center gap-2">
+                <span className={`text-xs font-black px-2.5 py-1 rounded-xl border ${
+                  isLight ? 'bg-orange-50 border-orange-200 text-orange-800' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'
+                }`}>
+                  Mesa Activa: {activeTable.tableName}
+                </span>
+                <span className={`text-xs font-mono font-black ${
+                  activeTable.total > 0 ? (isLight ? 'text-emerald-700' : 'text-emerald-400') : 'text-slate-400'
+                }`}>
+                  Total: S/ {activeTable.total.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            {/* Selector Rápido de Mesas en la cabecera */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-md">
+              {tables.map(tbl => {
+                const isActive = tbl.tableId === activeTableId;
+                const inKitchen = tbl.status === 'en_preparacion';
+                const toPay = tbl.status === 'por_cobrar';
+                const isFree = tbl.status === 'libre';
+                let statusDot = 'bg-emerald-500';
+                if (inKitchen) statusDot = 'bg-cyan-400 animate-pulse';
+                else if (toPay) statusDot = 'bg-purple-400';
+                else if (!isFree) statusDot = 'bg-amber-400';
+
+                return (
+                  <button
+                    key={tbl.tableId}
+                    onClick={() => setActiveTableId(tbl.tableId)}
+                    className={'px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ' +
+                      (isActive
+                        ? 'bg-orange-600 text-white border-orange-500 shadow-sm'
+                        : isLight
+                        ? 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800')}
+                  >
+                    <span className={'w-2 h-2 rounded-full ' + statusDot}></span>
+                    <span>{tbl.tableName}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Barra de pestañas móviles (Catálogo / Comanda) solo visible en pantallas < lg */}
+          <div className="lg:hidden flex border-b bg-slate-900 border-slate-800">
+            <button
+              onClick={() => setMobileTab('menu')}
+              className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                mobileTab === 'menu'
+                  ? 'border-orange-500 text-orange-400 bg-orange-500/10'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>🍽️ Carta / Menú</span>
+            </button>
+            <button
+              onClick={() => setMobileTab('comanda')}
+              className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
+                mobileTab === 'comanda'
+                  ? 'border-orange-500 text-orange-400 bg-orange-500/10'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <span>📋 Comanda ({activeTable.items.length})</span>
+              {activeTable.total > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">
+                  S/{activeTable.total.toFixed(0)}
                 </span>
               )}
             </button>
-          );
-        })}
+          </div>
 
-        <button
-          type="button"
-          onClick={() => addTakeoutTable()}
-          className="px-3 py-1.5 rounded-xl text-xs font-black bg-cyan-600 hover:bg-cyan-500 text-white flex items-center gap-1 shadow-md shadow-cyan-600/20 shrink-0 active:scale-95 transition-all"
-          title="Crear un nuevo pedido para llevar paralelo"
-        >
-          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-          <span>+ Llevar</span>
-        </button>
-      </div>
-
-      {/* Barra de pestañas móviles (Catálogo / Comanda) solo visible en pantallas < lg */}
-      <div className="lg:hidden flex border-b bg-slate-900 border-slate-800">
-        <button
-          onClick={() => setMobileTab('menu')}
-          className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-            mobileTab === 'menu'
-              ? 'border-orange-500 text-orange-400 bg-orange-500/10'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <span>🍽️ Carta / Menú</span>
-        </button>
-        <button
-          onClick={() => setMobileTab('comanda')}
-          className={`flex-1 py-2.5 text-center text-xs font-black transition-all border-b-2 flex items-center justify-center gap-1.5 ${
-            mobileTab === 'comanda'
-              ? 'border-orange-500 text-orange-400 bg-orange-500/10'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <span>📋 Comanda ({activeTable.items.length})</span>
-          {activeTable.total > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">
-              S/{activeTable.total.toFixed(0)}
-            </span>
-          )}
-        </button>
-      </div>
-
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div className={`flex-1 flex flex-col overflow-hidden border-r ${
           isLight ? 'border-slate-300' : 'border-slate-800'
         } ${mobileTab === 'comanda' ? 'hidden lg:flex' : 'flex'}`}>
@@ -796,8 +1046,11 @@ export const PosModule: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
+  )}
+
       {/* Botón flotante de acceso a Comanda en Móviles cuando se está explorando el Menú */}
-      {mobileTab === 'menu' && activeTable.items.length > 0 && (
+      {posViewMode === 'order' && mobileTab === 'menu' && activeTable.items.length > 0 && (
         <div className="lg:hidden fixed bottom-4 left-4 right-4 z-40">
           <button
             onClick={() => setMobileTab('comanda')}
