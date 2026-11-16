@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Product, BomItem, QuickModifier } from '../types';
+import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 export const RecipesModule: React.FC = () => {
   const {
@@ -35,6 +36,32 @@ export const RecipesModule: React.FC = () => {
       a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
     );
   }, [ingredients]);
+
+  // Opciones de insumos para SearchableSelect (con código, unidad y costo)
+  const ingredientOptions: SearchableOption[] = useMemo(() => {
+    return sortedIngredients.map(ing => ({
+      id: ing.id,
+      code: ing.code,
+      label: ing.name,
+      subtitle: `S/ ${ing.costPerUnit.toFixed(2)} / ${ing.unit}`,
+      badge: `${ing.unit}`,
+      category: ing.category
+    }));
+  }, [sortedIngredients]);
+
+  // Opciones de toppings maestros para SearchableSelect
+  const toppingOptions: SearchableOption[] = useMemo(() => {
+    return toppingsMaster.map(tm => {
+      const linkedIng = ingredients.find(i => i.id === tm.ingredientId);
+      return {
+        id: tm.id,
+        code: 'TOP',
+        label: tm.name,
+        subtitle: `${tm.portionQuantity} ${tm.portionUnit} de ${linkedIng?.name || tm.ingredientId}`,
+        badge: `+ S/ ${tm.defaultPriceDelta.toFixed(2)}`
+      };
+    });
+  }, [toppingsMaster, ingredients]);
 
   // Todas las recetas activas del catálogo (incluye recetas de carta y subrecetas pre-elaboradas)
   const allProducts = menuConfig.lines.flatMap(l =>
@@ -1025,32 +1052,31 @@ export const RecipesModule: React.FC = () => {
                 </div>
               )}
 
-              {/* Constructor de Insumos BOM con layout anti-desborde */}
+              {/* Constructor de Insumos BOM con layout anti-desborde y autocompletado */}
               <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2.5">
                 <label className="block text-xs font-bold text-amber-300">
-                  Agregar Insumos o Subrecetas Componentes (BOM) — Orden Alfabético A-Z
+                  Agregar Insumos o Subrecetas Componentes (BOM) — Búsqueda Inteligente
                 </label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={tempIngId}
-                    onChange={e => setTempIngId(e.target.value)}
-                    className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-white rounded-xl p-2 text-xs font-semibold focus:outline-none"
-                  >
-                    {sortedIngredients.map(ing => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.unit}) - S/{ing.costPerUnit.toFixed(2)}/{ing.unit}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <div className="flex-1 min-w-0">
+                    <SearchableSelect
+                      options={ingredientOptions}
+                      value={tempIngId}
+                      onChange={setTempIngId}
+                      placeholder="Escribe para buscar insumo o subreceta..."
+                      searchPlaceholder="Buscar por nombre, código o categoría..."
+                      isLight={isLight}
+                    />
+                  </div>
 
                   <div className="flex items-center gap-2 shrink-0">
                     <input
                       type="number"
                       step="any"
-                      placeholder="Cantidad"
+                      placeholder="Cant."
                       value={tempQty}
                       onChange={e => setTempQty(e.target.value)}
-                      className="w-20 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none"
+                      className="w-20 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
                     />
 
                     <button
@@ -1314,21 +1340,17 @@ export const RecipesModule: React.FC = () => {
                       No hay toppings registrados en el Catálogo Maestro de Toppings.
                     </div>
                   ) : (
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <select
-                        value={selectedToppingId}
-                        onChange={e => setSelectedToppingId(e.target.value)}
-                        className="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl px-3 py-2 text-xs font-semibold focus:outline-none focus:border-amber-500"
-                      >
-                        {toppingsMaster.map(tm => {
-                          const linkedIng = ingredients.find(i => i.id === tm.ingredientId);
-                          return (
-                            <option key={tm.id} value={tm.id}>
-                              {tm.name} ({tm.portionQuantity} {tm.portionUnit} de {linkedIng?.name || tm.ingredientId}) — S/ {tm.defaultPriceDelta.toFixed(2)}
-                            </option>
-                          );
-                        })}
-                      </select>
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                      <div className="flex-1 min-w-0">
+                        <SearchableSelect
+                          options={toppingOptions}
+                          value={selectedToppingId}
+                          onChange={setSelectedToppingId}
+                          placeholder="Buscar topping por nombre o porción..."
+                          searchPlaceholder="Escribe: leche deslactosada, chantilly, fudge..."
+                          isLight={isLight}
+                        />
+                      </div>
 
                       <button
                         type="button"
@@ -1354,9 +1376,9 @@ export const RecipesModule: React.FC = () => {
                             }
                           }
                         }}
-                        className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow-md shadow-amber-500/10"
+                        className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center justify-center gap-1"
                       >
-                        + Añadir Topping Maestro
+                        <span>+ Añadir Topping</span>
                       </button>
                     </div>
                   )}
@@ -1418,35 +1440,34 @@ export const RecipesModule: React.FC = () => {
               {/* Insumos BOM de la Receta */}
               <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2">
                 <label className="block text-xs font-bold text-amber-300">
-                  Composición de Insumos & Descartables (BOM) — Orden Alfabético A-Z
+                  Composición de Insumos & Descartables (BOM) — Búsqueda Inteligente
                 </label>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <select
-                    value={editTempIngId}
-                    onChange={e => setEditTempIngId(e.target.value)}
-                    className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-white rounded-xl p-2 text-xs font-semibold focus:outline-none"
-                  >
-                    {sortedIngredients.map(ing => (
-                      <option key={ing.id} value={ing.id}>
-                        {ing.name} ({ing.unit}) - S/ {ing.costPerUnit.toFixed(2)}/{ing.unit}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <div className="flex-1 min-w-0">
+                    <SearchableSelect
+                      options={ingredientOptions}
+                      value={editTempIngId}
+                      onChange={setEditTempIngId}
+                      placeholder="Escribe para buscar insumo o subreceta..."
+                      searchPlaceholder="Buscar: fresa, leche, cmc, base..."
+                      isLight={isLight}
+                    />
+                  </div>
 
                   <div className="flex items-center gap-2 shrink-0">
                     <input
                       type="number"
                       step="any"
-                      placeholder="Cantidad"
+                      placeholder="Cant."
                       value={editTempQty}
                       onChange={e => setEditTempQty(e.target.value)}
-                      className="w-24 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none"
+                      className="w-24 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
                     />
 
                     <button
                       type="button"
                       onClick={handleAddEditBomItem}
-                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95"
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all"
                     >
                       + Añadir
                     </button>

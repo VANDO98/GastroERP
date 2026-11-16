@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShoppingBag,
   CheckCircle2,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { MeasurementUnit, ItemType } from '../types';
+import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 export const PurchasesModule: React.FC = () => {
   const { ingredients, purchases, addPurchase, suppliers, themeMode } = useApp();
@@ -26,6 +27,17 @@ export const PurchasesModule: React.FC = () => {
   const filteredIngredients = ingredients.filter(i =>
     activeTypeTab === 'all' ? true : i.itemType === activeTypeTab
   );
+
+  const purchaseOptions: SearchableOption[] = useMemo(() => {
+    return filteredIngredients.map(ing => ({
+      id: ing.id,
+      code: ing.code || ing.itemType.toUpperCase(),
+      label: ing.name,
+      subtitle: `S/ ${ing.costPerUnit.toFixed(2)} por ${ing.unit}`,
+      badge: ing.unit,
+      category: ing.category
+    }));
+  }, [filteredIngredients]);
 
   const currentIngredient = ingredients.find(i => i.id === selectedIngredientId) || filteredIngredients[0] || ingredients[0];
 
@@ -129,20 +141,19 @@ export const PurchasesModule: React.FC = () => {
         )}
 
         <form onSubmit={handleSavePurchase} className="flex flex-col gap-3.5">
-          {/* Selector de Insumo */}
+          {/* Selector de Insumo con Autocompletado */}
           <div>
-            <label className="text-[10px] uppercase font-bold text-slate-400">Seleccionar Artículo</label>
-            <select
-              value={currentIngredient?.id || ''}
-              onChange={e => setSelectedIngredientId(e.target.value)}
-              className={'w-full mt-1 px-3 py-2.5 rounded-2xl text-xs font-bold border focus:outline-none focus:ring-2 focus:ring-emerald-500 ' + (isLight ? 'bg-slate-50 border-slate-300 text-slate-900' : 'bg-slate-950 border-slate-800 text-white')}
-            >
-              {filteredIngredients.map(ing => (
-                <option key={ing.id} value={ing.id}>
-                  [{ing.itemType.toUpperCase()}] {ing.name} ({ing.unit}) • S/{ing.costPerUnit.toFixed(2)}
-                </option>
-              ))}
-            </select>
+            <label className="text-[10px] uppercase font-bold text-slate-400">Seleccionar Artículo (Búsqueda Inteligente)</label>
+            <div className="mt-1">
+              <SearchableSelect
+                options={purchaseOptions}
+                value={currentIngredient?.id || ''}
+                onChange={setSelectedIngredientId}
+                placeholder="Escribe para buscar insumo..."
+                searchPlaceholder="Buscar por nombre, código o categoría..."
+                isLight={isLight}
+              />
+            </div>
           </div>
 
           {/* Proveedor */}

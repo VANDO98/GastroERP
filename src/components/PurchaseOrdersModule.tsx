@@ -28,6 +28,7 @@ import type {
   DetailedPurchaseInvoice,
   DetailedPurchaseItem
 } from '../types';
+import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 export const PurchaseOrdersModule: React.FC = () => {
   const {
@@ -49,6 +50,17 @@ export const PurchaseOrdersModule: React.FC = () => {
       a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
     );
   }, [ingredients]);
+
+  const poIngredientOptions: SearchableOption[] = useMemo(() => {
+    return sortedIngredients.map(ing => ({
+      id: ing.id,
+      code: ing.code,
+      label: ing.name,
+      subtitle: `Ref: S/ ${ing.costPerUnit.toFixed(2)} por ${ing.unit}`,
+      badge: ing.unit,
+      category: ing.category
+    }));
+  }, [sortedIngredients]);
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<'all' | PurchaseOrderStatus>('all');
@@ -853,26 +865,25 @@ export const PurchaseOrdersModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Selector de Insumos para la OC */}
+            {/* Selector de Insumos para la OC con Autocompletado */}
             <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2.5">
               <label className="block text-xs font-bold text-amber-300">
-                Añadir Insumos Solicitados (Orden Alfabético A-Z)
+                Añadir Insumos Solicitados — Búsqueda Inteligente
               </label>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                <select
-                  value={tempIngId}
-                  onChange={e => handleSelectTempIngredient(e.target.value)}
-                  className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-white rounded-xl p-2 text-xs font-semibold focus:outline-none"
-                >
-                  {sortedIngredients.map(ing => (
-                    <option key={ing.id} value={ing.id}>
-                      {ing.name} ({ing.unit}) - Ref: S/ {ing.costPerUnit.toFixed(2)}
-                    </option>
-                  ))}
-                </select>
+              <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <div className="flex-1 min-w-0">
+                  <SearchableSelect
+                    options={poIngredientOptions}
+                    value={tempIngId}
+                    onChange={handleSelectTempIngredient}
+                    placeholder="Escribe para buscar insumo..."
+                    searchPlaceholder="Buscar por nombre, código o categoría..."
+                    isLight={isLight}
+                  />
+                </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <div className="w-24">
                     <input
                       type="number"

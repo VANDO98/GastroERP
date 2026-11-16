@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Sparkles,
   Plus,
@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Combo, ComboItem } from '../types';
+import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 export const CombosModule: React.FC = () => {
   const {
@@ -32,6 +33,17 @@ export const CombosModule: React.FC = () => {
   const allFinalProducts = menuConfig.lines
     .flatMap(line => line.categories.flatMap(cat => cat.products))
     .filter(p => p.recipeType !== 'base' && p.recipeType !== 'intermedia' && !p.sku.startsWith('SUB-'));
+
+  // Opciones para autocompletado inteligente
+  const comboProductOptions: SearchableOption[] = useMemo(() => {
+    return allFinalProducts.map(p => ({
+      id: p.id,
+      code: p.sku,
+      label: p.name,
+      subtitle: `Precio regular: S/ ${p.price.toFixed(2)}`,
+      badge: `S/ ${p.price.toFixed(2)}`
+    }));
+  }, [allFinalProducts]);
 
   // Estados de modal
   const [showModal, setShowModal] = useState(false);
@@ -591,36 +603,37 @@ export const CombosModule: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex gap-2">
-                  <select
-                    value={tempProductId}
-                    onChange={e => setTempProductId(e.target.value)}
-                    className="flex-1 bg-slate-900 border border-slate-700 text-white rounded-xl p-2 text-xs focus:outline-none"
-                  >
-                    {allFinalProducts.map(p => (
-                      <option key={p.id} value={p.id}>
-                        [{p.sku}] {p.name} (S/ {p.price.toFixed(2)})
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <div className="flex-1 min-w-0">
+                    <SearchableSelect
+                      options={comboProductOptions}
+                      value={tempProductId}
+                      onChange={setTempProductId}
+                      placeholder="Buscar receta para el combo..."
+                      searchPlaceholder="Escribe: frappé, sándwich, jugo, waffle..."
+                      isLight={isLight}
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    min="1"
-                    max="10"
-                    value={tempQty}
-                    onChange={e => setTempQty(parseInt(e.target.value, 10) || 1)}
-                    className="w-16 bg-slate-900 border border-slate-700 text-white font-bold text-center rounded-xl p-2 text-xs focus:outline-none"
-                    title="Cantidad"
-                  />
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={tempQty}
+                      onChange={e => setTempQty(parseInt(e.target.value, 10) || 1)}
+                      className="w-16 bg-slate-900 border border-slate-700 text-white font-bold text-center rounded-xl p-2 text-xs focus:outline-none"
+                      title="Cantidad de unidades"
+                    />
 
-                  <button
-                    type="button"
-                    onClick={handleAddItem}
-                    className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all"
-                  >
-                    + Añadir
-                  </button>
+                    <button
+                      type="button"
+                      onClick={handleAddItem}
+                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all"
+                    >
+                      + Añadir
+                    </button>
+                  </div>
                 </div>
 
                 {/* Lista de Recetas Añadidas */}
