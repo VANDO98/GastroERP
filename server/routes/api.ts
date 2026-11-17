@@ -92,6 +92,17 @@ export function createApiRouter(io: Server) {
       const categoriesRows = db.prepare('SELECT name FROM custom_categories').all() as { name: string }[];
       const customCategories = categoriesRows.map(c => c.name);
 
+      const ingCatRows = db.prepare('SELECT * FROM ingredient_categories ORDER BY label ASC').all() as any[];
+      const ingredientCategories = ingCatRows.map(c => ({
+        id: c.id,
+        name: c.name,
+        label: c.label,
+        icon: c.icon || '🏷️',
+        defaultUnit: c.default_unit || 'und',
+        defaultQty: Number(c.default_qty) || 1,
+        isSlotCategory: Boolean(c.is_slot_category)
+      }));
+
       res.json({
         companyConfig: companyConfigRow ? JSON.parse(companyConfigRow.data) : null,
         tablesConfig: tablesConfigRow ? JSON.parse(tablesConfigRow.data) : [],
@@ -106,7 +117,8 @@ export function createApiRouter(io: Server) {
         suppliers,
         wastes,
         productionOrders,
-        customCategories
+        customCategories,
+        ingredientCategories
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -505,6 +517,145 @@ export function createApiRouter(io: Server) {
       });
       tx();
       io.emit('custom_categories:updated', categories);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // 16. Maestro Central de Categorías de Insumos (con control de Slots para Recetas y POS)
+  router.get('/ingredient-categories', (_req, res) => {
+    try {
+      const rows = db.prepare('SELECT * FROM ingredient_categories ORDER BY label ASC').all() as any[];
+      const categories = rows.map(c => ({
+        id: c.id,
+        name: c.name,
+        label: c.label,
+        icon: c.icon || '🏷️',
+        defaultUnit: c.default_unit || 'und',
+        defaultQty: Number(c.default_qty) || 1,
+        isSlotCategory: Boolean(c.is_slot_category)
+      }));
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.post('/ingredient-categories', (req, res) => {
+    try {
+      const { id, name, label, icon, defaultUnit, defaultQty, isSlotCategory } = req.body;
+      const cleanName = (name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      const catId = id || cleanName || `cat_${Date.now()}`;
+      const catLabel = label || name || 'Nueva Categoría';
+
+      const stmt = db.prepare(`
+        INSERT INTO ingredient_categories (id, name, label, icon, default_unit, default_qty, is_slot_category, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          label = excluded.label,
+          icon = excluded.icon,
+          default_unit = excluded.default_unit,
+          default_qty = excluded.default_qty,
+          is_slot_category = excluded.is_slot_category,
+          updated_at = CURRENT_TIMESTAMP
+      `);
+
+      stmt.run(
+        catId,
+        cleanName || catId,
+        catLabel,
+        icon || '🏷️',
+        defaultUnit || 'und',
+        Number(defaultQty) || 1,
+        isSlotCategory ? 1 : 0
+      );
+
+      const allRows = db.prepare('SELECT * FROM ingredient_categories ORDER BY label ASC').all() as any[];
+      const categories = allRows.map(c => ({
+        id: c.id,
+        name: c.name,
+        label: c.label,
+        icon: c.icon || '🏷️',
+        defaultUnit: c.default_unit || 'und',
+        defaultQty: Number(c.default_qty) || 1,
+        isSlotCategory: Boolean(c.is_slot_category)
+      }));
+
+      io.emit('ingredient_categories:updated', categories);
+      res.json({ success: true, category: { id: catId, name: cleanName, label: catLabel, icon, defaultUnit, defaultQty, isSlotCategory: Boolean(isSlotCategory) } });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.put('/ingredient-categories/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, label, icon, defaultUnit, defaultQty, isSlotCategory } = req.body;
+
+      db.prepare(`
+        UPDATE ingredient_categories
+        SET name = COALESCE(?, name),
+            label = COALESCE(?, label),
+            icon = COALESCE(?, icon),
+            default_unit = COALESCE(?, default_unit),
+            default_qty = COALESCE(?, default_qty),
+            is_slot_category = COALESCE(?, is_slot_category),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        name ? name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') : null,
+        label ? label.trim() : null,
+        icon ?? null,
+        defaultUnit ?? null,
+        defaultQty !== undefined ? Number(defaultQty) : null,
+        isSlotCategory !== undefined ? (isSlotCategory ? 1 : 0) : null,
+        id
+      );
+
+      const allRows = db.prepare('SELECT * FROM ingredient_categories ORDER BY label ASC').all() as any[];
+      const categories = allRows.map(c => ({
+        id: c.id,
+        name: c.name,
+        label: c.label,
+        icon: c.icon || '🏷️',
+        defaultUnit: c.default_unit || 'und',
+        defaultQty: Number(c.default_qty) || 1,
+        isSlotCategory: Boolean(c.is_slot_category)
+      }));
+
+      io.emit('ingredient_categories:updated', categories);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  router.delete('/ingredient-categories/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      // Verificar si hay insumos asociados
+      const inUse = db.prepare('SELECT count(*) as count FROM ingredients WHERE category = ?').get(id) as { count: number };
+      if (inUse && inUse.count > 0) {
+        return res.status(400).json({ error: `No se puede eliminar la categoría porque tiene ${inUse.count} insumo(s) asignado(s).` });
+      }
+
+      db.prepare('DELETE FROM ingredient_categories WHERE id = ?').run(id);
+
+      const allRows = db.prepare('SELECT * FROM ingredient_categories ORDER BY label ASC').all() as any[];
+      const categories = allRows.map(c => ({
+        id: c.id,
+        name: c.name,
+        label: c.label,
+        icon: c.icon || '🏷️',
+        defaultUnit: c.default_unit || 'und',
+        defaultQty: Number(c.default_qty) || 1,
+        isSlotCategory: Boolean(c.is_slot_category)
+      }));
+
+      io.emit('ingredient_categories:updated', categories);
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

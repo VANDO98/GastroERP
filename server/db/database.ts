@@ -184,6 +184,19 @@ export function initDatabase() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE
     );
+
+    -- Maestro Central de Categorías de Insumos (con control de slots para recetas y POS)
+    CREATE TABLE IF NOT EXISTS ingredient_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      label TEXT NOT NULL,
+      icon TEXT DEFAULT '🏷️',
+      default_unit TEXT DEFAULT 'und',
+      default_qty REAL DEFAULT 1,
+      is_slot_category INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 }
 

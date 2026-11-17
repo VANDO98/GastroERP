@@ -22,7 +22,8 @@ import type {
   ToppingMaster,
   TableConfig,
   ProductionOrder,
-  ProductionOrderStatus
+  ProductionOrderStatus,
+  IngredientCategory
 } from '../types';
 import { initialIngredients } from '../data/initialInventory';
 import { initialMenuConfig } from '../data/menuConfig';
@@ -51,7 +52,10 @@ import {
   saveToppingsMaster,
   savePurchaseOrders,
   saveCombos,
-  saveCustomCategories
+  saveCustomCategories,
+  saveIngredientCategory,
+  updateIngredientCategoryApi,
+  deleteIngredientCategoryApi
 } from '../services/apiService';
 
 
@@ -157,7 +161,10 @@ interface AppContextType {
   updateIngredient: (updated: Ingredient) => void;
   addIngredient: (newIng: Omit<Ingredient, 'id' | 'batches'> & { initialUnitCost?: number }) => void;
   customIngredientCategories: string[];
-  addIngredientCategory: (name: string) => void;
+  ingredientCategories: IngredientCategory[];
+  addIngredientCategory: (cat: string | (Omit<IngredientCategory, 'id'> & { id?: string })) => Promise<void>;
+  updateIngredientCategory: (cat: IngredientCategory) => Promise<void>;
+  deleteIngredientCategory: (id: string) => Promise<void>;
 
   // Mesas & Comandas
   tables: TableOrder[];
@@ -298,9 +305,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // 1. Estados en memoria: Solo el esqueleto inicial, 100% alimentado por SQLite en fetchBootstrap
+  // 1. Estados en memoria: Inicializados con datos de arranque seguros y sincronizados al 100% con SQLite en fetchBootstrap
   const [menuConfig, setMenuConfig] = useState<MenuConfig>(initialMenuConfig);
-  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
   const [tables, setTables] = useState<TableOrder[]>(defaultTables);
   const [activeTableId, setActiveTableId] = useState<string>('mesa-1');
   const [orders, setOrders] = useState<Order[]>([]);
@@ -308,13 +315,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
   const [batches, setBatches] = useState<BatchProduction[]>([]);
   const [wastes, setWastes] = useState<WasteRecord[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [combos, setCombos] = useState<Combo[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+  const [combos, setCombos] = useState<Combo[]>(initialCombos);
   const [customIngredientCategories, setCustomIngredientCategories] = useState<string[]>([]);
+  const [ingredientCategories, setIngredientCategories] = useState<IngredientCategory[]>([
+    { id: 'helados', name: 'helados', label: 'Sabores de Helado', icon: '🍨', defaultUnit: 'L', defaultQty: 0.07, isSlotCategory: true },
+    { id: 'panaderia', name: 'panaderia', label: 'Panadería & Panes', icon: '🥖', defaultUnit: 'und', defaultQty: 1, isSlotCategory: true },
+    { id: 'jarabes_bases', name: 'jarabes_bases', label: 'Jarabes, Salsas & Coberturas', icon: '🍯', defaultUnit: 'L', defaultQty: 0.03, isSlotCategory: true },
+    { id: 'frutas', name: 'frutas', label: 'Frutas Frescas', icon: '🍓', defaultUnit: 'kg', defaultQty: 0.08, isSlotCategory: false },
+    { id: 'lacteos', name: 'lacteos', label: 'Lácteos & Derivados', icon: '🥛', defaultUnit: 'L', defaultQty: 0.15, isSlotCategory: false },
+    { id: 'proteinas', name: 'proteinas', label: 'Proteínas & Fiambres', icon: '🥩', defaultUnit: 'kg', defaultQty: 0.05, isSlotCategory: false },
+    { id: 'abarrotes', name: 'abarrotes', label: 'Abarrotes & Secos', icon: '🌾', defaultUnit: 'kg', defaultQty: 0.05, isSlotCategory: false },
+    { id: 'descartables', name: 'descartables', label: 'Empaques & Descartables', icon: '📦', defaultUnit: 'und', defaultQty: 1, isSlotCategory: false },
+    { id: 'consumibles', name: 'consumibles', label: 'Limpieza & Químicos', icon: '🧼', defaultUnit: 'und', defaultQty: 1, isSlotCategory: false },
+  ]);
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(initialCompanyConfig);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [toppingsMaster, setToppingsMaster] = useState<ToppingMaster[]>([]);
-  const [tablesConfig, setTablesConfig] = useState<TableConfig[]>([]);
+  const [toppingsMaster, setToppingsMaster] = useState<ToppingMaster[]>(initialToppingsMaster);
+  const [tablesConfig, setTablesConfig] = useState<TableConfig[]>(initialTablesConfig);
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
 
   // Bandera para evitar retransmitir al servidor lo que acabamos de recibir por WebSocket
@@ -341,6 +359,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.wastes) setWastes(data.wastes);
         if (data.productionOrders) setProductionOrders(data.productionOrders);
         if (data.customCategories) setCustomIngredientCategories(data.customCategories);
+        if (data.ingredientCategories && data.ingredientCategories.length > 0) {
+          setIngredientCategories(data.ingredientCategories);
+        }
         setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
       })
       .catch(err => {
@@ -411,6 +432,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
     };
 
+    const handleIngredientCategoriesUpdated = (cats: IngredientCategory[]) => {
+      isIncomingSocketUpdate.current = true;
+      setIngredientCategories(cats);
+      setTimeout(() => { isIncomingSocketUpdate.current = false; }, 300);
+    };
+
     socket.on('tables:updated', handleTablesUpdated);
     socket.on('order:created', handleOrderCreated);
     socket.on('ingredients:updated', handleIngredientsUpdated);
@@ -421,6 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     socket.on('toppings:updated', handleToppingsUpdated);
     socket.on('tables_config:updated', handleTablesConfigUpdated);
     socket.on('suppliers:updated', handleSuppliersUpdated);
+    socket.on('ingredient_categories:updated', handleIngredientCategoriesUpdated);
 
     return () => {
       isMounted = false;
@@ -434,6 +462,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       socket.off('toppings:updated', handleToppingsUpdated);
       socket.off('tables_config:updated', handleTablesConfigUpdated);
       socket.off('suppliers:updated', handleSuppliersUpdated);
+      socket.off('ingredient_categories:updated', handleIngredientCategoriesUpdated);
     };
   }, []);
 
@@ -567,10 +596,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addIngredientCategory = (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed || customIngredientCategories.includes(trimmed)) return;
-    setCustomIngredientCategories(prev => [...prev, trimmed]);
+  const addIngredientCategory = async (cat: string | (Omit<IngredientCategory, 'id'> & { id?: string })) => {
+    let newCat: IngredientCategory;
+    if (typeof cat === 'string') {
+      const trimmed = cat.trim();
+      if (!trimmed) return;
+      const slug = trimmed.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      newCat = {
+        id: slug,
+        name: slug,
+        label: trimmed,
+        icon: '🏷️',
+        defaultUnit: 'und',
+        defaultQty: 1,
+        isSlotCategory: false
+      };
+    } else {
+      const slug = (cat.name || cat.label || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+      newCat = {
+        id: cat.id || slug,
+        name: slug,
+        label: cat.label || cat.name,
+        icon: cat.icon || '🏷️',
+        defaultUnit: cat.defaultUnit || 'und',
+        defaultQty: Number(cat.defaultQty) || 1,
+        isSlotCategory: Boolean(cat.isSlotCategory)
+      };
+    }
+
+    setIngredientCategories(prev => {
+      const filtered = prev.filter(c => c.id !== newCat.id);
+      return [...filtered, newCat];
+    });
+
+    setCustomIngredientCategories(prev => {
+      if (prev.includes(newCat.name)) return prev;
+      return [...prev, newCat.name];
+    });
+
+    try {
+      await saveIngredientCategory(newCat);
+    } catch (err) {
+      console.error('Error al guardar categoría en backend:', err);
+    }
+  };
+
+  const updateIngredientCategory = async (cat: IngredientCategory) => {
+    setIngredientCategories(prev => prev.map(c => c.id === cat.id ? cat : c));
+    try {
+      await updateIngredientCategoryApi(cat.id, cat);
+    } catch (err) {
+      console.error('Error al actualizar categoría:', err);
+    }
+  };
+
+  const deleteIngredientCategory = async (id: string) => {
+    setIngredientCategories(prev => prev.filter(c => c.id !== id));
+    setCustomIngredientCategories(prev => prev.filter(name => name !== id));
+    try {
+      await deleteIngredientCategoryApi(id);
+    } catch (err) {
+      console.error('Error al eliminar categoría:', err);
+    }
   };
 
   // Cálculo auxiliar de descartables (Regla mixta: ≤ S/1.50 cobra S/1.00; > S/1.50 cobra costo real)
@@ -793,18 +880,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
 
-        // Descuento estricto de Toppings vinculados a insumos o subrecetas
+        // 1.1 Descuento de slots de sabor dinámicos (ej. Bolas de helado en Helado Simple, Doble, Triple, Banana Split)
+        if (item.selectedSlots && item.selectedSlots.length > 0) {
+          item.selectedSlots.forEach(slot => {
+            if (slot.ingredientId && slot.quantity > 0) {
+              applyDeduction(slot.ingredientId, slot.quantity * item.quantity);
+            }
+          });
+        }
+
+        // 1.2 Descuento de envase o presentación seleccionada (ej. Cono barquillo o Vasito + cucharita)
+        if (item.selectedServing && item.selectedServing.ingredientId) {
+          applyDeduction(item.selectedServing.ingredientId, 1 * item.quantity);
+        }
+
+        // 1.3 Descuento estricto de Toppings vinculados a insumos o subrecetas (incluyendo variantes de sabor)
         item.selectedModifiers.forEach(mod => {
+          // Si el topping tiene una variante de sabor específica elegida por el mozo (ej. Helado Lúcuma):
+          const effectiveIngredientId = mod.selectedVariantIngredientId || mod.ingredientId;
+
           // 1. Modificador con descuento directo de insumo y porción
-          if (mod.ingredientId && mod.quantity && mod.quantity > 0) {
-            applyDeduction(mod.ingredientId, mod.quantity * item.quantity);
+          if (effectiveIngredientId && mod.quantity && mod.quantity > 0) {
+            applyDeduction(effectiveIngredientId, mod.quantity * item.quantity);
             return;
           }
           // 2. Modificador registrado en catálogo maestro de toppings
           if (mod.toppingMasterId) {
             const masterTop = toppingsMaster.find(t => t.id === mod.toppingMasterId);
             if (masterTop) {
-              applyDeduction(masterTop.ingredientId, masterTop.portionQuantity * item.quantity);
+              const targetIngId = mod.selectedVariantIngredientId || masterTop.ingredientId;
+              applyDeduction(targetIngId, masterTop.portionQuantity * item.quantity);
               return;
             }
           }
@@ -812,8 +917,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const allProducts = menuConfig.lines.flatMap(l => l.categories.flatMap(c => c.products));
           const prod = allProducts.find(p => p.id === item.productId);
           const foundMod = prod?.quickModifiers.find(m => m.id === mod.id);
-          if (foundMod?.ingredientId && foundMod.quantity) {
-            applyDeduction(foundMod.ingredientId, foundMod.quantity * item.quantity);
+          const fallbackIngId = mod.selectedVariantIngredientId || foundMod?.ingredientId;
+          if (fallbackIngId && foundMod?.quantity) {
+            applyDeduction(fallbackIngId, foundMod.quantity * item.quantity);
           } else if (foundMod?.inventoryImpact) {
             foundMod.inventoryImpact.forEach(impact => {
               applyDeduction(impact.ingredientId, impact.qtyDelta * item.quantity);
@@ -1611,7 +1717,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateIngredient,
         addIngredient,
         customIngredientCategories,
+        ingredientCategories,
         addIngredientCategory,
+        updateIngredientCategory,
+        deleteIngredientCategory,
         tables,
         activeTableId,
         setActiveTableId,

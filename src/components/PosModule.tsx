@@ -5,11 +5,11 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useApp } from '../context/AppContext';
-import type { Product, QuickModifier, OrderItem, OrderItemModifier, ManualDisposable, Combo, BomItem, TableOrder } from '../types';
+import type { Product, QuickModifier, OrderItem, OrderItemModifier, ManualDisposable, Combo, BomItem, TableOrder, SelectedFlavorSlot, SelectedServing } from '../types';
 
 export const PosModule: React.FC = () => {
   const {
-    menuConfig, ingredients, tables, activeTableId, setActiveTableId,
+    menuConfig, ingredients, ingredientCategories, tables, activeTableId, setActiveTableId,
     updateTableItems, addManualDisposableToTable, removeManualDisposableFromTable,
     sendTableToKitchen, checkoutAndCloseTable, addTakeoutTable, removeTakeoutTable, themeMode, combos,
     toppingsMaster
@@ -25,7 +25,10 @@ export const PosModule: React.FC = () => {
   const [selectedLineId, setSelectedLineId] = useState<'linea-fria' | 'linea-caliente' | 'combos'>('linea-fria');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeProductForModal, setActiveProductForModal] = useState<Product | null>(null);
-  const [tempModifiers, setTempModifiers] = useState<QuickModifier[]>([]);
+  const [tempModifiers, setTempModifiers] = useState<(QuickModifier & { selectedVariantIngredientId?: string; selectedVariantName?: string })[]>([]);
+  const [tempSlotSelections, setTempSlotSelections] = useState<Record<number, string>>({});
+  const [tempServingSelection, setTempServingSelection] = useState<string>('');
+  const [variantPickingMod, setVariantPickingMod] = useState<QuickModifier | null>(null);
   const [mobileTab, setMobileTab] = useState<'menu' | 'comanda'>('menu');
   const [showManualDisposablesModal, setShowManualDisposablesModal] = useState<boolean>(false);
 
@@ -174,21 +177,72 @@ export const PosModule: React.FC = () => {
     );
   };
 
-  const addItemToActiveTable = (product: Product, modifiers: QuickModifier[]) => {
+  const getFlavorInfo = (ingredientId: string, requiredQuantity: number = 0.001) => {
+    const ing = ingredients.find(i => i.id === ingredientId);
+    let emoji = '📦';
+    if (ing) {
+      const lower = ing.name.toLowerCase();
+      if (lower.includes('vainilla')) emoji = '🍦';
+      else if (lower.includes('chocolate')) emoji = '🍫';
+      else if (lower.includes('fresa')) emoji = '🍓';
+      else if (lower.includes('lucuma') || lower.includes('lúcuma')) emoji = '🍈';
+      else if (lower.includes('mango')) emoji = '🥭';
+      else if (lower.includes('maracuya') || lower.includes('maracuyá')) emoji = '🌴';
+      else if (lower.includes('pan') || lower.includes('ciabatta') || lower.includes('frances') || lower.includes('francés') || lower.includes('croissant') || lower.includes('brioche') || lower.includes('molde')) emoji = '🥖';
+      else if (lower.includes('leche')) emoji = '🥛';
+      else if (lower.includes('fudge') || lower.includes('jarabe') || lower.includes('miel') || lower.includes('algarrobina')) emoji = '🍯';
+      else if (lower.includes('queso') || lower.includes('edam')) emoji = '🧀';
+      else if (lower.includes('jamon') || lower.includes('jamón') || lower.includes('pollo') || lower.includes('pavo')) emoji = '🥩';
+      else {
+        const cat = ingredientCategories.find(c => c.id === ing.category || c.name === ing.category);
+        if (cat?.icon) emoji = cat.icon;
+      }
+    }
+    return {
+      ing,
+      id: ingredientId,
+      name: ing?.name.replace(/^(Helado |Pan )/i, '') || ingredientId,
+      fullName: ing?.name || ingredientId,
+      emoji,
+      stock: ing?.stock || 0,
+      unit: ing?.unit || 'und',
+      isAvailable: (ing?.stock || 0) >= Math.max(requiredQuantity, 0.001)
+    };
+  };
+
+  const addItemToActiveTable = (
+    product: Product,
+    modifiers: (QuickModifier & { selectedVariantIngredientId?: string; selectedVariantName?: string })[],
+    selectedSlots?: SelectedFlavorSlot[],
+    selectedServing?: SelectedServing
+  ) => {
     const modTotal = modifiers.reduce((acc, m) => acc + m.priceDelta, 0);
-    const unitPrice = product.price + modTotal;
+    const servingDelta = selectedServing?.priceDelta || 0;
+    const unitPrice = product.price + modTotal + servingDelta;
     const formattedMods: OrderItemModifier[] = modifiers.map(m => ({
-      id: m.id, label: m.label, priceDelta: m.priceDelta
+      id: m.id,
+      label: m.label,
+      priceDelta: m.priceDelta,
+      toppingMasterId: m.toppingMasterId,
+      ingredientId: m.ingredientId,
+      quantity: m.quantity,
+      unit: m.unit,
+      selectedVariantIngredientId: m.selectedVariantIngredientId,
+      selectedVariantName: m.selectedVariantName
     }));
 
-    const modKey = formattedMods.map(m => m.id).sort().join(',');
+    const modKey = formattedMods.map(m => `${m.id}:${m.selectedVariantIngredientId || ''}`).sort().join(',');
+    const slotsKey = (selectedSlots || []).map(s => `${s.slotIndex}:${s.ingredientId}`).sort().join(',');
+    const servingKey = selectedServing?.id || '';
 
     // Buscar si ya existe un ítem idéntico y con kitchenStatus === 'pendiente'
     const existingIndex = activeTable.items.findIndex(item => {
       if (item.productId !== product.id) return false;
       if (item.kitchenStatus !== 'pendiente') return false;
-      const itemModKey = (item.selectedModifiers || []).map(m => m.id).sort().join(',');
-      return itemModKey === modKey;
+      const itemModKey = (item.selectedModifiers || []).map(m => `${m.id}:${m.selectedVariantIngredientId || ''}`).sort().join(',');
+      const itemSlotsKey = (item.selectedSlots || []).map(s => `${s.slotIndex}:${s.ingredientId}`).sort().join(',');
+      const itemServingKey = item.selectedServing?.id || '';
+      return itemModKey === modKey && itemSlotsKey === slotsKey && itemServingKey === servingKey;
     });
 
     let newItems: OrderItem[];
@@ -213,6 +267,8 @@ export const PosModule: React.FC = () => {
         price: unitPrice,
         quantity: 1,
         selectedModifiers: formattedMods,
+        selectedSlots,
+        selectedServing,
         itemTotal: unitPrice,
         recipeBom: product.recipeBom,
         kitchenStatus: 'pendiente'
@@ -225,15 +281,85 @@ export const PosModule: React.FC = () => {
 
   const handleFastAdd = (product: Product, e: React.MouseEvent) => {
     e.stopPropagation();
-    addItemToActiveTable(product, []);
+    if (product.flavorSlots && product.flavorSlots.length > 0) {
+      handleOpenModifiers(product);
+    } else {
+      addItemToActiveTable(product, []);
+    }
   };
 
   const handleOpenModifiers = (product: Product) => {
     setActiveProductForModal(product);
     setTempModifiers([]);
+    setVariantPickingMod(null);
+
+    // Inicializar slots de opciones y variantes
+    const initialSlots: Record<number, string> = {};
+    if (product.flavorSlots) {
+      product.flavorSlots.forEach(slot => {
+        let allowed: string[] = [];
+        if (slot.allowedIngredientIds && slot.allowedIngredientIds.length > 0) {
+          allowed = slot.allowedIngredientIds;
+        } else if (slot.category && slot.category !== 'todas') {
+          allowed = ingredients.filter(i => i.category === slot.category).map(i => i.id);
+        } else {
+          allowed = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+        }
+
+        const firstAvail = allowed.find(id => {
+          const ing = ingredients.find(i => i.id === id);
+          return ing && ing.stock >= (slot.quantity || 0.05);
+        }) || allowed[0] || '';
+
+        if (firstAvail) {
+          initialSlots[slot.slotIndex] = firstAvail;
+        }
+      });
+    }
+    setTempSlotSelections(initialSlots);
+
+    // Inicializar opción de presentación
+    if (product.servingOptions && product.servingOptions.length > 0) {
+      setTempServingSelection(product.servingOptions[0].id);
+    } else {
+      setTempServingSelection('');
+    }
   };
 
   const toggleModalModifier = (mod: QuickModifier) => {
+    const masterTop = mod.toppingMasterId
+      ? toppingsMaster.find(t => t.id === mod.toppingMasterId)
+      : toppingsMaster.find(t => t.name.toLowerCase() === mod.label.toLowerCase());
+
+    const hasVariants = Boolean(mod.hasVariants || masterTop?.hasVariants);
+
+    // Si el modificador tiene variantes de sabor (ej. + Bola de Helado), abrir selector de sabor
+    if (hasVariants) {
+      // Si ya estaba seleccionado, al presionar de nuevo se desmarca
+      const alreadySelected = tempModifiers.some(m => m.id === mod.id);
+      if (alreadySelected && variantPickingMod?.id !== mod.id) {
+        setTempModifiers(prev => prev.filter(m => m.id !== mod.id));
+        setVariantPickingMod(null);
+        return;
+      }
+
+      const allowedIngredientIds = mod.allowedIngredientIds || masterTop?.allowedIngredientIds || [
+        'ing-base-helado-vainilla',
+        'ing-helado-chocolate',
+        'ing-helado-fresa',
+        'ing-helado-lucuma',
+        'ing-helado-mango',
+        'ing-helado-maracuya'
+      ];
+
+      setVariantPickingMod({
+        ...mod,
+        hasVariants: true,
+        allowedIngredientIds
+      });
+      return;
+    }
+
     if (tempModifiers.some(m => m.id === mod.id)) {
       setTempModifiers(prev => prev.filter(m => m.id !== mod.id));
     } else {
@@ -241,12 +367,72 @@ export const PosModule: React.FC = () => {
     }
   };
 
-  const confirmModalAdd = () => {
-    if (activeProductForModal) {
-      addItemToActiveTable(activeProductForModal, tempModifiers);
-      setActiveProductForModal(null);
-      setTempModifiers([]);
+  const handleSelectModifierVariant = (mod: QuickModifier, variantIngId: string) => {
+    const info = getFlavorInfo(variantIngId);
+    const existingIndex = tempModifiers.findIndex(m => m.id === mod.id);
+
+    const updatedMod = {
+      ...mod,
+      label: `+ ${mod.label.replace(/^\+\s*/, '')} (${info.name})`,
+      selectedVariantIngredientId: variantIngId,
+      selectedVariantName: info.name
+    };
+
+    if (existingIndex >= 0) {
+      setTempModifiers(prev => prev.map((m, idx) => idx === existingIndex ? updatedMod : m));
+    } else {
+      setTempModifiers(prev => [...prev, updatedMod]);
     }
+    setVariantPickingMod(null);
+  };
+
+  const confirmModalAdd = () => {
+    if (!activeProductForModal) return;
+
+    // Validar que todos los slots requeridos tengan un sabor seleccionado
+    if (activeProductForModal.flavorSlots) {
+      for (const slot of activeProductForModal.flavorSlots) {
+        if (slot.required && !tempSlotSelections[slot.slotIndex]) {
+          alert(`Por favor selecciona el sabor para ${slot.label}.`);
+          return;
+        }
+      }
+    }
+
+    // Construir lista de slots formateados
+    const formattedSlots: SelectedFlavorSlot[] = (activeProductForModal.flavorSlots || []).map(slot => {
+      const ingId = tempSlotSelections[slot.slotIndex];
+      const info = getFlavorInfo(ingId);
+      return {
+        slotIndex: slot.slotIndex,
+        slotLabel: slot.label,
+        ingredientId: ingId,
+        ingredientName: info.name,
+        quantity: slot.quantity,
+        unit: slot.unit
+      };
+    });
+
+    // Construir serving seleccionado
+    let selectedServingObj: SelectedServing | undefined;
+    if (activeProductForModal.servingOptions && tempServingSelection) {
+      const foundServing = activeProductForModal.servingOptions.find(s => s.id === tempServingSelection);
+      if (foundServing) {
+        selectedServingObj = {
+          id: foundServing.id,
+          name: foundServing.name,
+          ingredientId: foundServing.ingredientId,
+          priceDelta: foundServing.priceDelta
+        };
+      }
+    }
+
+    addItemToActiveTable(activeProductForModal, tempModifiers, formattedSlots.length > 0 ? formattedSlots : undefined, selectedServingObj);
+    setActiveProductForModal(null);
+    setTempModifiers([]);
+    setTempSlotSelections({});
+    setTempServingSelection('');
+    setVariantPickingMod(null);
   };
 
   const updateItemQuantity = (cartItemId: string, delta: number) => {
@@ -375,13 +561,13 @@ export const PosModule: React.FC = () => {
                 className="px-4 py-2.5 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black text-xs shadow-lg shadow-cyan-600/20 flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[3]" />
-                <span>+ Nuevo Pedido Para Llevar</span>
+                <span>Nuevo Pedido Para Llevar</span>
               </button>
             </div>
           </div>
 
           {/* Cuadrícula de Tarjetas Grandes de Mesas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
             {tables.map(tbl => {
               const inKitchen = tbl.status === 'en_preparacion';
               const toPay = tbl.status === 'por_cobrar';
@@ -415,26 +601,26 @@ export const PosModule: React.FC = () => {
                     setActiveTableId(tbl.tableId);
                     setPosViewMode('order');
                   }}
-                  className={`rounded-3xl border p-4.5 flex flex-col justify-between shadow-sm hover:shadow-md transition-all cursor-pointer group relative ${
-                    isLight ? 'bg-white' : 'bg-slate-900/90'
+                  className={`rounded-3xl border p-5 sm:p-6 flex flex-col justify-between shadow-sm hover:shadow-xl transition-all cursor-pointer group relative ${
+                    isLight ? 'bg-white' : 'bg-slate-900/95'
                   } ${borderStyle}`}
                 >
                   {/* Cabecera de la Tarjeta */}
                   <div>
                     <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`w-3 h-3 rounded-full ${
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-3.5 h-3.5 rounded-full ${
                           inKitchen ? 'bg-cyan-400 animate-pulse' : toPay ? 'bg-purple-400' : isFree ? 'bg-emerald-500' : 'bg-amber-400'
                         }`} />
-                        <h3 className={`text-base font-black group-hover:text-orange-500 transition-colors ${
+                        <h3 className={`text-lg font-black group-hover:text-orange-500 transition-colors ${
                           isLight ? 'text-slate-900' : 'text-white'
                         }`}>
                           {tbl.tableName}
                         </h3>
                       </div>
 
-                      <div className="flex items-center gap-1">
-                        <span className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full font-bold border ${badgeBg}`}>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] font-mono uppercase px-2.5 py-0.5 rounded-full font-bold border ${badgeBg}`}>
                           {statusLabel}
                         </span>
                         {isTakeout && tbl.tableId !== 'llevar' && (
@@ -454,7 +640,7 @@ export const PosModule: React.FC = () => {
                     </div>
 
                     {/* Subtítulo o nombre de cliente */}
-                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3 flex items-center justify-between">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-3.5 flex items-center justify-between">
                       <span>{tbl.customerName ? `Cliente: ${tbl.customerName}` : isTakeout ? 'Para Llevar / Empaque' : 'Servicio en Salón'}</span>
                       {tbl.items.length > 0 && (
                         <span className="font-mono text-[11px] font-bold text-slate-600 dark:text-slate-300">
@@ -465,10 +651,10 @@ export const PosModule: React.FC = () => {
 
                     {/* Resumen de ítems si tiene comanda activa */}
                     {tbl.items.length > 0 ? (
-                      <div className={`p-2.5 rounded-2xl border text-xs mb-3 space-y-1 ${
+                      <div className={`p-3 rounded-2xl border text-xs mb-3 space-y-1.5 ${
                         isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-slate-800'
                       }`}>
-                        {tbl.items.slice(0, 3).map((item, idx) => (
+                        {tbl.items.slice(0, 4).map((item, idx) => (
                           <div key={idx} className="flex items-center justify-between text-slate-700 dark:text-slate-300">
                             <span className="truncate pr-1">
                               <strong className="text-orange-500 font-mono">{item.quantity}x</strong> {item.name}
@@ -478,81 +664,49 @@ export const PosModule: React.FC = () => {
                             </span>
                           </div>
                         ))}
-                        {tbl.items.length > 3 && (
-                          <div className="text-[10px] text-slate-500 font-bold italic pt-0.5 text-center">
-                            + {tbl.items.length - 3} productos más...
+                        {tbl.items.length > 4 && (
+                          <div className="text-[10px] text-slate-500 font-bold italic pt-1 text-center">
+                            + {tbl.items.length - 4} productos más...
                           </div>
                         )}
                       </div>
                     ) : (
-                      <div className={`p-3 rounded-2xl border border-dashed text-center text-xs text-slate-400 mb-3 ${
-                        isLight ? 'bg-slate-50/60 border-slate-200' : 'bg-slate-950/30 border-slate-800/60'
+                      <div className={`p-4 rounded-2xl border border-dashed text-center text-xs text-slate-400 mb-3 ${
+                        isLight ? 'bg-slate-50/70 border-slate-200' : 'bg-slate-950/40 border-slate-800/70'
                       }`}>
-                        <Coffee className="w-4 h-4 mx-auto mb-1 opacity-40 text-emerald-500" />
-                        <span>Mesa disponible para comanda</span>
+                        <Coffee className="w-5 h-5 mx-auto mb-1.5 opacity-50 text-emerald-500" />
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">Mesa disponible para comanda</span>
+                        <p className="text-[10px] text-slate-400 mt-0.5">Toca para abrir y tomar pedido</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Pie de la Tarjeta con Total y Botones de Acción */}
-                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800/80">
-                    <div className="flex items-baseline justify-between mb-2">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total Acumulado:</span>
-                      <span className={`text-xl font-mono font-black ${
-                        tbl.total > 0
-                          ? isLight ? 'text-emerald-700' : 'text-emerald-400'
-                          : 'text-slate-400'
-                      }`}>
-                        S/ {tbl.total.toFixed(2)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-1.5 pt-1">
-                      {tbl.items.length > 0 ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setInspectingTable(tbl);
-                            }}
-                            className={`py-1.5 px-2 rounded-xl text-[11px] font-bold border flex items-center justify-center gap-1 transition-all ${
-                              isLight
-                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300'
-                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                            }`}
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Ver Comanda</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveTableId(tbl.tableId);
-                              setPosViewMode('order');
-                            }}
-                            className="py-1.5 px-2 rounded-xl text-[11px] font-black bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all"
-                          >
-                            <span>Tomar / Modificar</span>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveTableId(tbl.tableId);
-                            setPosViewMode('order');
-                          }}
-                          className="col-span-2 py-2 rounded-xl text-xs font-black bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  {/* Pie de la Tarjeta con Total y Acción directa */}
+                  <div className="pt-3 border-t border-slate-200 dark:border-slate-800/80">
+                    {tbl.items.length > 0 ? (
+                      <div className="flex items-baseline justify-between">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total Acumulado:</span>
+                          <span className={`text-2xl font-mono font-black ${
+                            isLight ? 'text-emerald-700' : 'text-emerald-400'
+                          }`}>
+                            S/ {tbl.total.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs font-black text-orange-600 dark:text-orange-400 group-hover:translate-x-1 transition-transform">
+                          <span>Modificar</span>
+                          <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-400">Sin consumos</span>
+                        <div className="flex items-center gap-1 text-xs font-black text-emerald-600 dark:text-emerald-400 group-hover:translate-x-1 transition-transform">
                           <span>Tomar Pedido</span>
-                        </button>
-                      )}
-                    </div>
+                          <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -566,13 +720,13 @@ export const PosModule: React.FC = () => {
       {/* ========================================================================= */}
       {posViewMode === 'order' && (
         <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in">
-          {/* Barra Superior de Navegación: Botón Regresar a Mesas + Selector de Mesa Activa */}
+          {/* Barra Superior de Navegación: Botón Regresar a Mesas + Estado de Mesa Activa */}
           <div className={'px-3 py-2 border-b flex items-center justify-between gap-2 ' + (isLight ? 'bg-white border-slate-300' : 'bg-slate-900/90 border-slate-800')}>
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setPosViewMode('tables')}
-                className={`px-3 py-1.5 rounded-xl border font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-xl border font-black text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
                   isLight
                     ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300 shadow-sm'
                     : 'bg-slate-800 hover:bg-slate-700 text-white border-slate-700'
@@ -582,11 +736,11 @@ export const PosModule: React.FC = () => {
                 <span>← Volver a Salón de Mesas</span>
               </button>
 
-              <div className="hidden sm:flex items-center gap-2">
-                <span className={`text-xs font-black px-2.5 py-1 rounded-xl border ${
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-black px-3 py-1 rounded-xl border ${
                   isLight ? 'bg-orange-50 border-orange-200 text-orange-800' : 'bg-orange-500/10 border-orange-500/20 text-orange-400'
                 }`}>
-                  Mesa Activa: {activeTable.tableName}
+                  Mesa: {activeTable.tableName}
                 </span>
                 <span className={`text-xs font-mono font-black ${
                   activeTable.total > 0 ? (isLight ? 'text-emerald-700' : 'text-emerald-400') : 'text-slate-400'
@@ -596,34 +750,17 @@ export const PosModule: React.FC = () => {
               </div>
             </div>
 
-            {/* Selector Rápido de Mesas en la cabecera */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar max-w-md">
-              {tables.map(tbl => {
-                const isActive = tbl.tableId === activeTableId;
-                const inKitchen = tbl.status === 'en_preparacion';
-                const toPay = tbl.status === 'por_cobrar';
-                const isFree = tbl.status === 'libre';
-                let statusDot = 'bg-emerald-500';
-                if (inKitchen) statusDot = 'bg-cyan-400 animate-pulse';
-                else if (toPay) statusDot = 'bg-purple-400';
-                else if (!isFree) statusDot = 'bg-amber-400';
-
-                return (
-                  <button
-                    key={tbl.tableId}
-                    onClick={() => setActiveTableId(tbl.tableId)}
-                    className={'px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 border ' +
-                      (isActive
-                        ? 'bg-orange-600 text-white border-orange-500 shadow-sm'
-                        : isLight
-                        ? 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-slate-100'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:bg-slate-800')}
-                  >
-                    <span className={'w-2 h-2 rounded-full ' + statusDot}></span>
-                    <span>{tbl.tableName}</span>
-                  </button>
-                );
-              })}
+            {/* Badge de Estado en barra */}
+            <div className="flex items-center gap-2">
+              <span className={`text-[11px] font-mono uppercase px-2.5 py-1 rounded-xl font-bold border ${
+                activeTable.status === 'en_preparacion'
+                  ? (isLight ? 'bg-cyan-100 text-cyan-800 border-cyan-300' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30')
+                  : activeTable.status === 'por_cobrar'
+                  ? (isLight ? 'bg-purple-100 text-purple-800 border-purple-300' : 'bg-purple-500/20 text-purple-400 border-purple-500/30')
+                  : (isLight ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30')
+              }`}>
+                {activeTable.status === 'en_preparacion' ? 'En Preparación' : activeTable.status === 'por_cobrar' ? 'Por Cobrar' : 'Libre'}
+              </span>
             </div>
           </div>
 
@@ -760,7 +897,8 @@ export const PosModule: React.FC = () => {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3">
                 {displayedProducts.map(product => {
-                  const hasModifiers = product.quickModifiers && product.quickModifiers.length > 0;
+                  const hasSlots = product.flavorSlots && product.flavorSlots.length > 0;
+                  const hasModifiers = (product.quickModifiers && product.quickModifiers.length > 0) || hasSlots;
                   const stockAlert = getProductStockAlert(product);
                   const isDrink = selectedLineId === 'linea-fria';
 
@@ -786,11 +924,15 @@ export const PosModule: React.FC = () => {
                           <span className="text-[9px] font-mono uppercase font-bold text-slate-400 truncate">
                             {product.sku}
                           </span>
-                          {hasModifiers && (
+                          {hasSlots ? (
+                            <span className="text-[8px] font-bold px-1 rounded bg-cyan-500/20 text-cyan-500 flex items-center gap-0.5">
+                              🍨 SABORES
+                            </span>
+                          ) : hasModifiers ? (
                             <span className="text-[8px] font-bold px-1 rounded bg-orange-500/20 text-orange-400">
                               OPC
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <h3 className="text-xs sm:text-sm font-black leading-tight line-clamp-2 mt-1">
                           {product.shortName || product.name}
@@ -801,7 +943,10 @@ export const PosModule: React.FC = () => {
                         <span className="font-mono text-xs sm:text-sm font-black text-emerald-500">
                           S/ {product.price.toFixed(2)}
                         </span>
-                        <div className="w-5 h-5 rounded-full bg-orange-600 hover:bg-orange-500 text-white text-xs font-black flex items-center justify-center shadow">
+                        <div
+                          onClick={(e) => handleFastAdd(product, e)}
+                          className="w-5 h-5 rounded-full bg-orange-600 hover:bg-orange-500 text-white text-xs font-black flex items-center justify-center shadow"
+                        >
                           +
                         </div>
                       </div>
@@ -906,6 +1051,20 @@ export const PosModule: React.FC = () => {
                       {item.isCombo && item.comboItems && (
                         <div className="text-[10px] text-slate-500 font-mono mt-0.5">
                           {item.comboItems.map(ci => `${ci.quantity}x ${ci.name}`).join(' + ')}
+                        </div>
+                      )}
+                      {item.selectedSlots && item.selectedSlots.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          <span className="text-[10px] bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 px-2 py-0.5 rounded-lg border border-cyan-500/30 font-bold flex items-center gap-1">
+                            <span>🍨</span>
+                            <span>Bolas: {item.selectedSlots.map(s => s.ingredientName).join(' + ')}</span>
+                          </span>
+                        </div>
+                      )}
+                      {item.selectedServing && (
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold mt-0.5 flex items-center gap-1">
+                          <span>📦</span>
+                          <span>Servir: {item.selectedServing.name}</span>
                         </div>
                       )}
                       {item.selectedModifiers.length > 0 && (
@@ -1070,59 +1229,302 @@ export const PosModule: React.FC = () => {
       )}
 
       {activeProductForModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className={'border rounded-3xl p-5 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 ' + (isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white')}>
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <span className="text-xs font-mono text-cyan-500 uppercase font-bold">Personalizar Receta</span>
-                <h3 className="text-lg font-black">{activeProductForModal.name}</h3>
-                <span className="text-emerald-600 font-bold text-sm">Base: S/ {activeProductForModal.price.toFixed(2)}</span>
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+          <div className={'border rounded-3xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-in fade-in zoom-in-95 flex flex-col justify-between ' + (isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-slate-900 border-slate-800 text-white')}>
+            <div>
+              {/* Header del Modal */}
+              <div className="flex items-start justify-between pb-3 border-b border-slate-200 dark:border-slate-800 mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-orange-500 uppercase font-black">
+                      {activeProductForModal.flavorSlots?.length ? '🍨 Selección de Helado & Sabores' : 'Personalizar Receta'}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">({activeProductForModal.sku})</span>
+                  </div>
+                  <h3 className="text-xl font-black mt-0.5">{activeProductForModal.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">
+                      Precio Base: S/ {activeProductForModal.price.toFixed(2)}
+                    </span>
+                    {activeProductForModal.flavorSlots && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-500 font-bold">
+                        {activeProductForModal.flavorSlots.length} {activeProductForModal.flavorSlots.length === 1 ? 'Bola' : 'Bolas'} a elección
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveProductForModal(null);
+                    setVariantPickingMod(null);
+                  }}
+                  className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center font-bold"
+                >
+                  ✕
+                </button>
               </div>
-              <button onClick={() => setActiveProductForModal(null)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center font-bold">✕</button>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
-              {activeProductForModal.quickModifiers.map(mod => {
-                const isSelected = tempModifiers.some(m => m.id === mod.id);
-                // Buscar topping maestro asociado para validar stock
-                const masterTop = mod.toppingMasterId
-                  ? toppingsMaster.find(t => t.id === mod.toppingMasterId)
-                  : toppingsMaster.find(t => t.name.toLowerCase() === mod.label.toLowerCase());
+              {/* 1. SELECCIÓN DE OPCIONES Y VARIANTES DINÁMICAS (PANES, HELADOS, LECHES, ETC.) */}
+              {activeProductForModal.flavorSlots && activeProductForModal.flavorSlots.length > 0 && (
+                <div className="mb-5 space-y-4 bg-cyan-500/5 p-4 rounded-2xl border border-cyan-500/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-cyan-600 dark:text-cyan-400 flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>1. Opciones & Variantes a Elección (Obligatorio)</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {activeProductForModal.flavorSlots.length} {activeProductForModal.flavorSlots.length === 1 ? 'opción requerida' : 'opciones requeridas'}
+                    </span>
+                  </div>
 
-                const linkedIng = masterTop
-                  ? ingredients.find(i => i.id === masterTop.ingredientId)
-                  : null;
+                  <div className="space-y-3.5">
+                    {activeProductForModal.flavorSlots.map(slot => {
+                      const selectedIngId = tempSlotSelections[slot.slotIndex];
+                      const selectedInfo = selectedIngId ? getFlavorInfo(selectedIngId, slot.quantity) : null;
 
-                const isLowStock = linkedIng && (linkedIng.stock <= 0 || linkedIng.stock < (masterTop?.portionQuantity || 0.001));
+                      // Obtener los insumos permitidos: de allowedIngredientIds o de su categoría vinculada
+                      let allowedIds: string[] = [];
+                      if (slot.allowedIngredientIds && slot.allowedIngredientIds.length > 0) {
+                        allowedIds = slot.allowedIngredientIds;
+                      } else if (slot.category && slot.category !== 'todas') {
+                        allowedIds = ingredients.filter(i => i.category === slot.category).map(i => i.id);
+                      } else {
+                        allowedIds = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+                      }
 
-                return (
-                  <button
-                    key={mod.id}
-                    onClick={() => toggleModalModifier(mod)}
-                    className={'p-3 rounded-xl border text-left flex items-center justify-between transition-all ' +
-                      (isSelected ? 'bg-orange-500/20 border-orange-500 text-orange-600 dark:text-orange-200 shadow-md ring-1 ring-orange-500' : isLight ? 'bg-slate-50 border-slate-300 text-slate-700 hover:border-slate-400' : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500')}
-                  >
-                    <div className="flex-1 pr-2">
-                      <div className="text-xs font-bold">{mod.label}</div>
-                      <div className="text-[11px] font-mono text-emerald-600 font-semibold">{mod.priceDelta > 0 ? ('+S/ ' + mod.priceDelta.toFixed(2)) : 'Sin recargo'}</div>
-                      {isLowStock && (
-                        <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
-                          <AlertTriangle className="w-2.5 h-2.5 text-amber-500 shrink-0" />
-                          <span>Kárdex: {linkedIng.stock.toFixed(2)} {linkedIng.unit} (Verificar)</span>
+                      return (
+                        <div key={slot.slotIndex} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs font-bold">
+                            <span className="text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                              <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-500 text-[10px] flex items-center justify-center font-bold">
+                                {slot.slotIndex + 1}
+                              </span>
+                              <span>{slot.label}:</span>
+                              <span className="text-[10px] font-normal text-slate-400 font-mono">
+                                ({slot.quantity} {slot.unit})
+                              </span>
+                            </span>
+                            <span className="text-cyan-600 dark:text-cyan-400 font-black flex items-center gap-1">
+                              {selectedInfo ? `${selectedInfo.emoji} ${selectedInfo.name} ✓` : 'Toca una opción'}
+                            </span>
+                          </div>
+
+                          {/* Chips de Opciones para este Slot */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {allowedIds.map(ingId => {
+                              const info = getFlavorInfo(ingId, slot.quantity);
+                              const isSlotSelected = selectedIngId === ingId;
+
+                              return (
+                                <button
+                                  key={ingId}
+                                  type="button"
+                                  disabled={!info.isAvailable}
+                                  onClick={() => {
+                                    setTempSlotSelections(prev => ({
+                                      ...prev,
+                                      [slot.slotIndex]: ingId
+                                    }));
+                                  }}
+                                  className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                    !info.isAvailable
+                                      ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-800'
+                                      : isSlotSelected
+                                      ? 'bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-md ring-2 ring-cyan-400'
+                                      : isLight
+                                      ? 'bg-white hover:bg-cyan-50 border-slate-300 text-slate-800'
+                                      : 'bg-slate-800/90 hover:bg-slate-700 border-slate-700 text-slate-200'
+                                  }`}
+                                >
+                                  <span className="text-base leading-none">{info.emoji}</span>
+                                  <span className="text-[11px] font-bold truncate max-w-full">{info.name}</span>
+                                  <span className={`text-[9px] font-mono ${isSlotSelected ? 'text-slate-900 font-semibold' : 'text-slate-400'}`}>
+                                    {info.isAvailable ? `Stock: ${info.stock.toFixed(info.unit === 'und' ? 0 : 1)} ${info.unit}` : 'Agotado'}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      )}
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 2. OPCIÓN DE SERVIR / PRESENTACIÓN */}
+              {activeProductForModal.servingOptions && activeProductForModal.servingOptions.length > 0 && (
+                <div className="mb-5 space-y-2">
+                  <span className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
+                    <span>📦</span>
+                    <span>2. Presentación / Servido</span>
+                  </span>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {activeProductForModal.servingOptions.map(srv => {
+                      const isSelected = tempServingSelection === srv.id;
+                      return (
+                        <button
+                          key={srv.id}
+                          type="button"
+                          onClick={() => setTempServingSelection(srv.id)}
+                          className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                            isSelected
+                              ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-2 ring-orange-400'
+                              : isLight
+                              ? 'bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700'
+                              : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                          }`}
+                        >
+                          <span>{srv.name.includes('Cono') ? '🍦' : '🍨'}</span>
+                          <span>{srv.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* 3. MODIFICADORES & TOPPINGS ADICIONALES */}
+              {activeProductForModal.quickModifiers.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-black uppercase text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>3. Toppings & Adicionales (Opcional)</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400">Toppings con costo extra</span>
+                  </div>
+
+                  {/* Sub-selector flotante si se pulsó un topping polimórfico con variantes (ej. + Bola de Helado) */}
+                  {variantPickingMod && (
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/40 rounded-2xl mb-3 space-y-2 animate-in fade-in">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-amber-500 flex items-center gap-1">
+                          <span>🍨</span>
+                          <span>¿Qué sabor deseas para "{variantPickingMod.label}"?</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setVariantPickingMod(null)}
+                          className="text-[10px] text-slate-400 hover:text-white"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {(variantPickingMod.allowedIngredientIds || [
+                          'ing-base-helado-vainilla',
+                          'ing-helado-chocolate',
+                          'ing-helado-fresa',
+                          'ing-helado-lucuma',
+                          'ing-helado-mango',
+                          'ing-helado-maracuya'
+                        ]).map(ingId => {
+                          const info = getFlavorInfo(ingId);
+                          return (
+                            <button
+                              key={ingId}
+                              type="button"
+                              disabled={!info.isAvailable}
+                              onClick={() => handleSelectModifierVariant(variantPickingMod, ingId)}
+                              className={`p-2 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-0.5 ${
+                                !info.isAvailable
+                                  ? 'opacity-40 cursor-not-allowed bg-slate-800 border-slate-700'
+                                  : 'bg-slate-900 hover:bg-amber-500 hover:text-slate-950 border-amber-500/30 text-slate-200'
+                              }`}
+                            >
+                              <span className="text-base">{info.emoji}</span>
+                              <span className="text-[11px] font-bold truncate max-w-full">{info.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className={'w-5 h-5 rounded-md border flex items-center justify-center text-xs font-bold shrink-0 ' + (isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-400')}>
-                      {isSelected ? '✓' : ''}
-                    </div>
-                  </button>
-                );
-              })}
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {activeProductForModal.quickModifiers.map(mod => {
+                      const isSelected = tempModifiers.some(m => m.id === mod.id);
+                      const selectedVariant = tempModifiers.find(m => m.id === mod.id);
+
+                      // Buscar topping maestro asociado para validar stock
+                      const masterTop = mod.toppingMasterId
+                        ? toppingsMaster.find(t => t.id === mod.toppingMasterId)
+                        : toppingsMaster.find(t => t.name.toLowerCase() === mod.label.toLowerCase());
+
+                      const hasVariants = Boolean(mod.hasVariants || masterTop?.hasVariants);
+                      const targetIngId = selectedVariant?.selectedVariantIngredientId || masterTop?.ingredientId;
+                      const linkedIng = targetIngId ? ingredients.find(i => i.id === targetIngId) : null;
+                      const isLowStock = linkedIng && (linkedIng.stock <= 0 || linkedIng.stock < (masterTop?.portionQuantity || 0.001));
+
+                      return (
+                        <button
+                          key={mod.id}
+                          type="button"
+                          onClick={() => toggleModalModifier(mod)}
+                          className={'p-3 rounded-xl border text-left flex items-center justify-between transition-all ' +
+                            (isSelected ? 'bg-orange-500/20 border-orange-500 text-orange-600 dark:text-orange-200 shadow-md ring-1 ring-orange-500' : isLight ? 'bg-slate-50 border-slate-300 text-slate-700 hover:border-slate-400' : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:border-slate-500')}
+                        >
+                          <div className="flex-1 pr-2">
+                            <div className="text-xs font-bold flex items-center gap-1">
+                              <span>{selectedVariant?.label || mod.label}</span>
+                              {hasVariants && !selectedVariant && (
+                                <span className="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1 rounded font-mono">🍨 [Elige sabor]</span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-mono text-emerald-600 font-semibold">{mod.priceDelta > 0 ? ('+S/ ' + mod.priceDelta.toFixed(2)) : 'Sin recargo'}</div>
+                            {isLowStock && (
+                              <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                <AlertTriangle className="w-2.5 h-2.5 text-amber-500 shrink-0" />
+                                <span>Kárdex: {linkedIng?.stock.toFixed(2)} {linkedIng?.unit}</span>
+                              </div>
+                            )}
+                          </div>
+                          <div className={'w-5 h-5 rounded-md border flex items-center justify-center text-xs font-bold shrink-0 ' + (isSelected ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-400')}>
+                            {isSelected ? '✓' : ''}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-2">
-              <button onClick={() => setActiveProductForModal(null)} className="flex-1 py-3 rounded-2xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs">Cancelar</button>
-              <button onClick={confirmModalAdd} className="flex-1 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs shadow-lg shadow-orange-600/30">Añadir al Ticket</button>
+            {/* Footer del Modal con Total Calculado y Botones */}
+            <div className="pt-4 border-t border-slate-200 dark:border-slate-800 mt-2">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-xs font-bold text-slate-400">Total a Pagar Ítem:</span>
+                <span className="text-xl font-mono font-black text-emerald-600 dark:text-emerald-400">
+                  S/ {(
+                    activeProductForModal.price +
+                    tempModifiers.reduce((acc, m) => acc + m.priceDelta, 0)
+                  ).toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveProductForModal(null);
+                    setVariantPickingMod(null);
+                  }}
+                  className="flex-1 py-3 rounded-2xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmModalAdd}
+                  className="flex-1 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-xs shadow-lg shadow-orange-600/30 active:scale-95 transition-all"
+                >
+                  Añadir al Ticket
+                </button>
+              </div>
             </div>
           </div>
         </div>

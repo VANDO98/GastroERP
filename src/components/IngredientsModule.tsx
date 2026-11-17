@@ -13,23 +13,51 @@ import {
   TrendingUp,
   PieChart,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Settings,
+  Trash2,
+  Sparkles,
+  Layers
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import type { Ingredient, MeasurementUnit, ItemType } from '../types';
+import type { Ingredient, MeasurementUnit, ItemType, IngredientCategory } from '../types';
 
 interface IngredientsModuleProps {
   onNavigateKardex?: () => void;
 }
 
 export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigateKardex }) => {
-  const { ingredients, updateIngredient, addIngredient, customIngredientCategories, addIngredientCategory, themeMode } = useApp();
+  const {
+    ingredients,
+    updateIngredient,
+    addIngredient,
+    ingredientCategories,
+    addIngredientCategory,
+    updateIngredientCategory,
+    deleteIngredientCategory,
+    themeMode
+  } = useApp();
   const isLight = themeMode === 'light';
 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [editingIngId, setEditingIngId] = useState<string | null>(null);
   const [showValuationModal, setShowValuationModal] = useState<boolean>(false);
+
+  // Modal para Crear / Editar Categoría Dinámica
+  const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
+  const [editingCategory, setEditingCategory] = useState<IngredientCategory | null>(null);
+  const [catFormLabel, setCatFormLabel] = useState<string>('');
+  const [catFormIcon, setCatFormIcon] = useState<string>('🏷️');
+  const [catFormUnit, setCatFormUnit] = useState<MeasurementUnit>('und');
+  const [catFormQty, setCatFormQty] = useState<string>('1');
+  const [catFormIsSlot, setCatFormIsSlot] = useState<boolean>(false);
+
+  // Edición en línea de insumo (incluyendo reasignación de categoría)
+  const [editStock, setEditStock] = useState<string>('');
+  const [editMinStock, setEditMinStock] = useState<string>('');
+  const [editCost, setEditCost] = useState<string>('');
+  const [editCategory, setEditCategory] = useState<string>('');
 
   // Totales valorizados para reporte general
   const valuationMetrics = useMemo(() => {
@@ -50,20 +78,15 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
         ? 'consumibles'
         : (ing.category || 'otros');
 
+      const foundCat = ingredientCategories.find(c => c.id === catKey || c.name === catKey);
       let catLabel = ing.itemType === 'subreceta'
         ? '🥣 Subrecetas / Pulpas'
         : ing.itemType === 'descartable'
         ? '📦 Empaques & Descartables'
         : ing.itemType === 'consumible'
         ? '🧼 Consumibles & Limpieza'
-        : ing.category === 'frutas'
-        ? '🍓 Frutas Frescas'
-        : ing.category === 'lacteos'
-        ? '🥛 Lácteos'
-        : ing.category === 'abarrotes'
-        ? '🌾 Abarrotes'
-        : ing.category === 'verduras'
-        ? '🥬 Verduras'
+        : foundCat
+        ? `${foundCat.icon || '🏷️'} ${foundCat.label}`
         : `🏷️ ${catKey.toUpperCase()}`;
 
       if (!byCategory[catKey]) {
@@ -100,23 +123,14 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
       topInvested,
       criticalStock
     };
-  }, [ingredients]);
-
-  // Nueva categoría dinámica
-  const [showAddCategoryInput, setShowAddCategoryInput] = useState<boolean>(false);
-  const [newCatName, setNewCatName] = useState<string>('');
-
-  // Formulario en línea de edición
-  const [editStock, setEditStock] = useState<string>('');
-  const [editMinStock, setEditMinStock] = useState<string>('');
-  const [editCost, setEditCost] = useState<string>('');
+  }, [ingredients, ingredientCategories]);
 
   // Modal para nuevo insumo
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newName, setNewName] = useState<string>('');
   const [newCode, setNewCode] = useState<string>('');
   const [newItemType, setNewItemType] = useState<ItemType>('insumo');
-  const [newCategory, setNewCategory] = useState<string>('frutas');
+  const [newCategory, setNewCategory] = useState<string>('helados');
   const [newUnit, setNewUnit] = useState<MeasurementUnit>('kg');
   const [newStock, setNewStock] = useState<string>('10.0');
   const [newMinStock, setNewMinStock] = useState<string>('2.0');
@@ -128,6 +142,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
     setEditStock(ing.stock.toString());
     setEditMinStock(ing.minStock.toString());
     setEditCost(ing.costPerUnit.toString());
+    setEditCategory(ing.category || '');
   };
 
   const saveEdit = (ing: Ingredient) => {
@@ -136,10 +151,71 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
       stock: parseFloat(editStock) || ing.stock,
       minStock: parseFloat(editMinStock) || ing.minStock,
       costPerUnit: parseFloat(editCost) || ing.costPerUnit,
+      category: ing.itemType === 'insumo' ? (editCategory || ing.category) : ing.category,
       lastUpdated: new Date().toISOString()
     };
     updateIngredient(updated);
     setEditingIngId(null);
+  };
+
+  const openCreateCategory = () => {
+    setEditingCategory(null);
+    setCatFormLabel('');
+    setCatFormIcon('🏷️');
+    setCatFormUnit('und');
+    setCatFormQty('1');
+    setCatFormIsSlot(false);
+    setShowCategoryModal(true);
+  };
+
+  const openEditCategory = (cat: IngredientCategory, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingCategory(cat);
+    setCatFormLabel(cat.label);
+    setCatFormIcon(cat.icon || '🏷️');
+    setCatFormUnit(cat.defaultUnit || 'und');
+    setCatFormQty((cat.defaultQty ?? 1).toString());
+    setCatFormIsSlot(Boolean(cat.isSlotCategory));
+    setShowCategoryModal(true);
+  };
+
+  const handleSaveCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!catFormLabel.trim()) return;
+
+    if (editingCategory) {
+      await updateIngredientCategory({
+        ...editingCategory,
+        label: catFormLabel.trim(),
+        icon: catFormIcon.trim() || '🏷️',
+        defaultUnit: catFormUnit,
+        defaultQty: parseFloat(catFormQty) || 1,
+        isSlotCategory: catFormIsSlot
+      });
+    } else {
+      await addIngredientCategory({
+        name: catFormLabel.trim(),
+        label: catFormLabel.trim(),
+        icon: catFormIcon.trim() || '🏷️',
+        defaultUnit: catFormUnit,
+        defaultQty: parseFloat(catFormQty) || 1,
+        isSlotCategory: catFormIsSlot
+      });
+    }
+    setShowCategoryModal(false);
+  };
+
+  const handleDeleteCategory = async (cat: IngredientCategory, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const count = ingredients.filter(i => i.category === cat.id || i.category === cat.name).length;
+    if (count > 0) {
+      alert(`No se puede eliminar la categoría "${cat.label}" porque tiene ${count} insumo(s) asignado(s). Reasigna los insumos a otra categoría primero.`);
+      return;
+    }
+    if (confirm(`¿Estás seguro de eliminar la categoría "${cat.label}"?`)) {
+      await deleteIngredientCategory(cat.id);
+      if (selectedCategory === cat.id) setSelectedCategory('all');
+    }
   };
 
   const handleCreateIngredient = (e: React.FormEvent) => {
@@ -298,89 +374,38 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
               <span>Categorías</span>
             </h3>
             <button
-              onClick={() => setShowAddCategoryInput(!showAddCategoryInput)}
-              className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-0.5"
+              type="button"
+              onClick={openCreateCategory}
+              className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-300 flex items-center gap-1 px-2 py-0.5 rounded-lg hover:bg-cyan-500/10 transition-all cursor-pointer"
+              title="Crear nueva categoría y configurar si es para slots de recetas"
             >
-              <Plus className="w-3 h-3 stroke-[3]" />
+              <Plus className="w-3.5 h-3.5 stroke-[3]" />
               <span>Nueva</span>
             </button>
           </div>
 
-          {/* Formulario rápido para nueva categoría */}
-          {showAddCategoryInput && (
-            <div className={`p-2.5 rounded-2xl border space-y-2 ${isLight ? 'bg-slate-50 border-cyan-200' : 'bg-slate-950 border-cyan-500/30'}`}>
-              <input
-                type="text"
-                placeholder="Nombre de categoría..."
-                value={newCatName}
-                onChange={e => setNewCatName(e.target.value)}
-                className={`w-full px-2.5 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none focus:ring-1 focus:ring-cyan-500 ${
-                  isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700 text-white'
-                }`}
-              />
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (newCatName.trim()) {
-                      addIngredientCategory(newCatName.trim());
-                      setNewCatName('');
-                      setShowAddCategoryInput(false);
-                    }
-                  }}
-                  className="flex-1 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg text-[11px]"
-                >
-                  Guardar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddCategoryInput(false);
-                    setNewCatName('');
-                  }}
-                  className="px-2 py-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg text-[11px]"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Lista Vertical de Categorías con Contadores */}
-          <div className="space-y-1 max-h-[550px] overflow-y-auto pr-1">
+          <div className="space-y-1.5 max-h-[550px] overflow-y-auto pr-1">
+            {/* Categorías fijas de sistema: Todas y Subrecetas */}
             {[
-              { id: 'all', label: 'Todos los Insumos', icon: '📦' },
-              { id: 'subrecetas', label: 'Subrecetas / Batches', icon: '🥣' },
-              { id: 'frutas', label: 'Frutas y Frescos', icon: '🍎' },
-              { id: 'lacteos', label: 'Lácteos y Derivados', icon: '🥛' },
-              { id: 'abarrotes', label: 'Abarrotes y Secos', icon: '🍞' },
-              { id: 'proteinas', label: 'Proteínas y Fiambres', icon: '🥩' },
-              { id: 'jarabes_bases', label: 'Jarabes y Bases', icon: '🍯' },
-              { id: 'descartables', label: 'Descartables / Empaque', icon: '🥡' },
-              { id: 'consumibles', label: 'Limpieza y Otros', icon: '🧹' },
-              ...customIngredientCategories.map(c => ({
-                id: c,
-                label: c,
-                icon: '🏷️'
-              }))
+              { id: 'all', label: 'Todos los Insumos', icon: '📦', isSlotCategory: false },
+              { id: 'subrecetas', label: 'Subrecetas / Batches', icon: '🥣', isSlotCategory: false },
+              ...ingredientCategories
             ].map(cat => {
               const count =
                 cat.id === 'all'
                   ? ingredients.length
                   : cat.id === 'subrecetas'
                   ? ingredients.filter(i => i.itemType === 'subreceta' || i.isIntermediateRecipe || (i.code && i.code.startsWith('SUB-'))).length
-                  : cat.id === 'descartables'
-                  ? ingredients.filter(i => i.itemType === 'descartable').length
-                  : cat.id === 'consumibles'
-                  ? ingredients.filter(i => i.itemType === 'consumible').length
-                  : ingredients.filter(i => i.category === cat.id).length;
+                  : ingredients.filter(i => i.category === cat.id || i.category === (cat as any).name).length;
               const isSelected = selectedCategory === cat.id;
+              const isCustomCategory = cat.id !== 'all' && cat.id !== 'subrecetas';
 
               return (
-                <button
+                <div
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all text-left ${
+                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded-2xl text-xs font-bold transition-all text-left group cursor-pointer ${
                     isSelected
                       ? 'bg-cyan-600 text-white shadow-md shadow-cyan-600/20 font-black'
                       : isLight
@@ -388,22 +413,62 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                       : 'text-slate-300 hover:bg-slate-800/60'
                   }`}
                 >
-                  <span className="flex items-center gap-2 truncate">
-                    <span>{cat.icon}</span>
+                  <div className="flex items-center gap-2 truncate flex-1 min-w-0 pr-1">
+                    <span className="text-base shrink-0">{cat.icon || '🏷️'}</span>
                     <span className="truncate">{cat.label}</span>
-                  </span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold shrink-0 ${
-                      isSelected
-                        ? 'bg-white/20 text-white'
-                        : isLight
-                        ? 'bg-slate-200 text-slate-700'
-                        : 'bg-slate-800 text-slate-400'
-                    }`}
-                  >
-                    {count}
-                  </span>
-                </button>
+                    {cat.isSlotCategory && (
+                      <span className={`text-[8px] font-mono uppercase px-1.5 py-0.2 rounded-full font-black shrink-0 ${
+                        isSelected
+                          ? 'bg-white/30 text-white'
+                          : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                      }`}>
+                        Slot
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : isLight
+                          ? 'bg-slate-200 text-slate-700'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {count}
+                    </span>
+
+                    {/* Botones de Gestión (Editar / Eliminar) */}
+                    {isCustomCategory && (
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          type="button"
+                          onClick={(e) => openEditCategory(cat as IngredientCategory, e)}
+                          className={`p-1 rounded-md transition-colors ${
+                            isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-cyan-500/20 text-slate-400 hover:text-cyan-400'
+                          }`}
+                          title="Editar categoría y toggle de Slot POS"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        {count === 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteCategory(cat as IngredientCategory, e)}
+                            className={`p-1 rounded-md transition-colors ${
+                              isSelected ? 'hover:bg-white/20 text-white' : 'hover:bg-rose-500/20 text-slate-400 hover:text-rose-400'
+                            }`}
+                            title="Eliminar categoría vacía"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -484,8 +549,45 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                       </div>
                     </td>
 
-                    <td className={`px-4 py-3 capitalize font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                      {ing.itemType === 'insumo' ? (ing.category?.replace('_', ' ') || 'Alimento') : ing.itemType}
+                    <td className="px-4 py-3 font-medium">
+                      {isEditing && ing.itemType === 'insumo' ? (
+                        <select
+                          value={editCategory}
+                          onChange={e => setEditCategory(e.target.value)}
+                          className={`border rounded px-2 py-1 text-xs font-bold focus:outline-none ${
+                            isLight ? 'bg-white border-cyan-500 text-slate-900' : 'bg-slate-950 border-cyan-500 text-white'
+                          }`}
+                        >
+                          {ingredientCategories.map(c => (
+                            <option key={c.id} value={c.id}>
+                              {c.icon || '🏷️'} {c.label} {c.isSlotCategory ? '(Slot POS)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          {(() => {
+                            const found = ingredientCategories.find(c => c.id === ing.category || c.name === ing.category);
+                            if (ing.itemType === 'subreceta') return <span className="text-purple-400 font-bold">🥣 Subreceta</span>;
+                            if (ing.itemType === 'descartable') return <span className="text-cyan-400 font-bold">📦 Empaque</span>;
+                            if (ing.itemType === 'consumible') return <span className="text-amber-400 font-bold">🧼 Limpieza</span>;
+                            if (found) {
+                              return (
+                                <span className={`flex items-center gap-1.5 font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                                  <span>{found.icon || '🏷️'}</span>
+                                  <span>{found.label}</span>
+                                  {found.isSlotCategory && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30">
+                                      Slot POS
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            }
+                            return <span className="text-slate-400">{ing.category || 'Sin categoría'}</span>;
+                          })()}
+                        </div>
+                      )}
                     </td>
 
                     <td className="px-4 py-3 text-center">
@@ -658,9 +760,9 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                   <select
                     value={newCategory}
                     onChange={e => {
-                      const c = e.target.value as any;
+                      const c = e.target.value;
                       setNewCategory(c);
-                      if (c === 'lacteos' || c === 'abarrotes' || c === 'jarabes_bases') {
+                      if (c === 'lacteos' || c === 'abarrotes' || c === 'jarabes_bases' || c === 'panaderia' || c === 'helados') {
                         setNewIsTaxAffected(true);
                       } else {
                         setNewIsTaxAffected(false);
@@ -668,13 +770,10 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                     }}
                     className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
                   >
-                    <option value="frutas">Frutas Frescas (Inafecto)</option>
-                    <option value="lacteos">Lácteos (Afecto 18%)</option>
-                    <option value="proteinas">Proteínas / Carnes</option>
-                    <option value="abarrotes">Abarrotes</option>
-                    <option value="jarabes_bases">Jarabes y Bases</option>
-                    {customIngredientCategories.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                    {ingredientCategories.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.icon || '🏷️'} {c.label} {c.isSlotCategory ? '(Slot POS)' : ''}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -744,6 +843,142 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                   className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-xl text-xs shadow-lg shadow-cyan-600/25"
                 >
                   Guardar Insumo
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL CREAR / EDITAR CATEGORÍA DINÁMICA ================= */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-cyan-500/15 rounded-xl text-cyan-400">
+                  <Filter className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-black text-lg text-white">
+                    {editingCategory ? 'Editar Categoría' : 'Nueva Categoría Dinámica'}
+                  </h3>
+                  <span className="text-xs text-slate-400">Clasificación de insumos & slots de elección</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCategoryModal(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCategory} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Nombre de la Categoría *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Salsas Especiales, Tipos de Pan..."
+                  value={catFormLabel}
+                  onChange={e => setCatFormLabel(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:border-cyan-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Emoji / Ícono Identificador</label>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl p-2 bg-slate-950 border border-slate-700 rounded-xl">{catFormIcon}</span>
+                  <input
+                    type="text"
+                    value={catFormIcon}
+                    onChange={e => setCatFormIcon(e.target.value)}
+                    placeholder="Emoji o icono..."
+                    className="flex-1 bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+                {/* Selector rápido de emojis */}
+                <div className="flex flex-wrap gap-1.5 p-2 bg-slate-950/60 rounded-xl border border-slate-800">
+                  {['🍨', '🥖', '🍯', '🍓', '🥛', '🥩', '🌾', '☕', '🍫', '🧀', '🥑', '🥤', '🥪', '🧂', '📦', '🧼', '🏷️'].map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setCatFormIcon(emoji)}
+                      className={`w-7 h-7 rounded-lg text-sm flex items-center justify-center hover:bg-cyan-500/20 transition-all ${
+                        catFormIcon === emoji ? 'bg-cyan-500/30 ring-1 ring-cyan-400' : 'bg-slate-900'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Unidad por Defecto</label>
+                  <select
+                    value={catFormUnit}
+                    onChange={e => setCatFormUnit(e.target.value as MeasurementUnit)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:border-cyan-500 focus:outline-none"
+                  >
+                    <option value="und">Unidades (und)</option>
+                    <option value="L">Litros (L)</option>
+                    <option value="kg">Kilos (kg)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Porción Slot (Defecto)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={catFormQty}
+                    onChange={e => setCatFormQty(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:border-cyan-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Interruptor Destacado: ¿Habilitar para Slots en Recetas & POS? */}
+              <div className="p-3.5 bg-cyan-950/30 rounded-2xl border border-cyan-500/30 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs font-black text-cyan-200">
+                      ¿Disponible para Slots de Selección en Recetas / POS?
+                    </span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={catFormIsSlot}
+                    onChange={e => setCatFormIsSlot(e.target.checked)}
+                    className="w-5 h-5 rounded text-cyan-500 focus:ring-cyan-400 cursor-pointer"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  {catFormIsSlot
+                    ? '✅ SÍ: Esta categoría aparecerá en el creador de recetas y en el POS para que el mozo o cliente elija un sabor/variedad (ej. Sabores de Helado, Panes, Salsas).'
+                    : '⚪ NO: Esta categoría es solo para compras, almacén e inventario general (ej. Abarrotes, Limpieza, Empaques). NO aparecerá en los slots de elección.'}
+                </p>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(false)}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-black rounded-xl text-xs shadow-lg shadow-cyan-600/25 active:scale-95 transition-all"
+                >
+                  {editingCategory ? 'Guardar Cambios' : 'Crear Categoría'}
                 </button>
               </div>
             </form>

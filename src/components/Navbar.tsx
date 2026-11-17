@@ -256,15 +256,15 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
   return (
     <>
       <header
-        className={`border-b px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 sticky top-0 z-40 backdrop-blur-md transition-colors ${
+        className={`border-b px-3 py-2 flex items-center justify-between gap-2 sticky top-0 z-40 backdrop-blur-md transition-colors ${
           isLight
             ? 'bg-white/95 border-slate-200 text-slate-900 shadow-sm'
             : 'bg-slate-950/95 border-slate-800 text-slate-100'
         }`}
       >
-        {/* Lado Izquierdo: Botón Menú ≡ (Tres Rayitas) + Logo Empresa + Módulo Activo */}
-        <div className="flex items-center gap-3">
-          {/* Botón Hamburguesa ≡ */}
+        {/* Lado Izquierdo: Botón Menú + Logo Empresa + Módulo Activo */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Botón Hamburguesa */}
           <button
             onClick={() => setIsMegaMenuOpen(prev => !prev)}
             aria-label="Abrir Menú de Navegación"
@@ -278,7 +278,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
           >
             {isMegaMenuOpen ? <X className="w-4 h-4 stroke-[2.5]" /> : <Menu className="w-4 h-4 stroke-[2.5]" />}
             <span className="hidden sm:inline uppercase tracking-wider font-extrabold text-[11px]">
-              Menú ≡
+              Menú
             </span>
           </button>
 
@@ -289,7 +289,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             </div>
             <div className="hidden md:block">
               <div className="flex items-center gap-1.5 leading-tight">
-                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-white">
+                <h1 className="font-black text-sm tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
                   {companyConfig?.tradeName || 'Sabor & Fruta'}
                 </h1>
                 <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
@@ -302,13 +302,13 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             </div>
           </div>
 
-          {/* Badge del Módulo Actual */}
-          <div className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${
+          {/* Badge del Módulo Actual (compacto y elegante para no empujar la barra) */}
+          <div className={`hidden 2xl:flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border max-w-xs truncate ${
             isLight ? 'bg-slate-100 border-slate-300 text-slate-700' : 'bg-slate-900/80 border-slate-800 text-slate-300'
           }`}>
             <span className="text-slate-400 text-[10px] uppercase font-mono">{currentTabTitle.group} /</span>
             <span>{currentTabTitle.icon}</span>
-            <span className="font-extrabold">{currentTabTitle.name}</span>
+            <span className="font-extrabold truncate">{currentTabTitle.name}</span>
           </div>
         </div>
 
@@ -445,7 +445,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
             }`}>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-amber-500 text-slate-950 flex items-center justify-center font-black text-xl shadow-lg shadow-amber-500/20">
-                  ≡
+                  <Menu className="w-5 h-5 stroke-[2.5]" />
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">

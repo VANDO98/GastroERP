@@ -92,11 +92,11 @@ export const ProductionWasteModule: React.FC = () => {
   const availableRecipes: RecipeOption[] = useMemo(() => {
     const list: RecipeOption[] = [];
 
-    // 1. Subrecetas del menú (SUB-xxx)
+    // 1. Recetas y Subrecetas desde el Menú Oficial persistido en SQLite
     menuConfig.lines.forEach(line => {
       line.categories.forEach(cat => {
         cat.products.forEach(p => {
-          if (p.recipeType === 'base' || p.sku.startsWith('SUB-')) {
+          if (p.recipeType === 'base' || p.sku.startsWith('SUB-') || (p.recipeBom && p.recipeBom.length > 0)) {
             const matchingIng = ingredients.find(
               i => i.code === p.sku || i.id === `ing-${p.id.replace('prod-', '').replace('rec-', '')}`
             );
@@ -105,86 +105,14 @@ export const ProductionWasteModule: React.FC = () => {
               code: p.sku,
               name: p.name,
               unit: (p.yieldUnit as MeasurementUnit) || 'kg',
-              recipeBom: p.recipeBom,
+              recipeBom: p.recipeBom || [],
               targetIngredientId: matchingIng?.id,
-              isSubrecipe: true
+              isSubrecipe: cat.id === 'cat-subrecetas-base' || p.recipeType === 'base' || p.sku.startsWith('SUB-')
             });
           }
         });
       });
     });
-
-    // 2. Subrecetas registradas en inventario de insumos (ej. pulpas de rescate)
-    ingredients
-      .filter(i => i.itemType === 'subreceta')
-      .forEach(sub => {
-        if (!list.some(r => r.code === sub.code || r.targetIngredientId === sub.id)) {
-          // Asociar un BOM estándar según la fruta y subreceta
-          let bom: BomItem[] = [];
-          if (sub.code === 'SUB-010') {
-            // Pack Mix Surtido Fresco (270g) por pack individual (con merma técnica de pelado)
-            bom = [
-              { ingredientId: 'ing-papaya', quantity: 0.140, unit: 'kg' },
-              { ingredientId: 'ing-pina', quantity: 0.130, unit: 'kg' },
-              { ingredientId: 'ing-platano', quantity: 0.075, unit: 'kg' },
-              { ingredientId: 'ing-fresa', quantity: 0.045, unit: 'kg' }
-            ];
-          } else if (sub.code === 'SUB-011') {
-            // Pack Mango Limpio Porcionado (180g)
-            bom = [{ ingredientId: 'ing-mango', quantity: 0.260, unit: 'kg' }];
-          } else if (sub.code === 'SUB-012') {
-            // Pack Fresa Limpia Porcionada (150g)
-            bom = [{ ingredientId: 'ing-fresa', quantity: 0.165, unit: 'kg' }];
-          } else if (sub.code === 'SUB-013') {
-            // Pack Papaya Limpia Porcionada (200g)
-            bom = [{ ingredientId: 'ing-papaya', quantity: 0.285, unit: 'kg' }];
-          } else if (sub.code === 'SUB-014') {
-            // Pack Piña Limpia Porcionada (180g)
-            bom = [{ ingredientId: 'ing-pina', quantity: 0.300, unit: 'kg' }];
-          } else if (sub.code === 'SUB-005') {
-            bom = [{ ingredientId: 'ing-papaya', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          } else if (sub.code === 'SUB-006') {
-            bom = [{ ingredientId: 'ing-fresa', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          } else if (sub.code === 'SUB-007') {
-            bom = [{ ingredientId: 'ing-pina', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          } else if (sub.code === 'SUB-008') {
-            bom = [{ ingredientId: 'ing-mango', quantity: 0.950, unit: 'kg' }, { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }];
-          } else if (sub.code === 'SUB-001') {
-            bom = [
-              { ingredientId: 'ing-papaya', quantity: 0.450, unit: 'kg' },
-              { ingredientId: 'ing-pina', quantity: 0.350, unit: 'kg' },
-              { ingredientId: 'ing-fresa', quantity: 0.150, unit: 'kg' },
-              { ingredientId: 'ing-azucar', quantity: 0.050, unit: 'kg' }
-            ];
-          } else if (sub.code === 'SUB-020') {
-            // Base Neutra para Frappés Lácteos (por cada 1 kg producido)
-            bom = [
-              { ingredientId: 'ing-crema-no-lactea', quantity: 0.298, unit: 'kg' },
-              { ingredientId: 'ing-leche-polvo', quantity: 0.358, unit: 'kg' },
-              { ingredientId: 'ing-azucar-glass', quantity: 0.298, unit: 'kg' },
-              { ingredientId: 'ing-cmc', quantity: 0.046, unit: 'kg' }
-            ];
-          } else if (sub.code === 'SUB-021') {
-            // Base Cristal para Frappés al Agua (por cada 1 kg producido)
-            bom = [
-              { ingredientId: 'ing-azucar', quantity: 0.978, unit: 'kg' },
-              { ingredientId: 'ing-cmc', quantity: 0.022, unit: 'kg' }
-            ];
-          } else {
-            bom = [{ ingredientId: 'ing-papaya', quantity: 1.0, unit: 'kg' }];
-          }
-
-          list.push({
-            id: `rec-${sub.id}`,
-            code: sub.code,
-            name: sub.name,
-            unit: sub.unit,
-            recipeBom: bom,
-            targetIngredientId: sub.id,
-            isSubrecipe: true
-          });
-        }
-      });
 
     return list;
   }, [menuConfig, ingredients]);
@@ -211,13 +139,7 @@ export const ProductionWasteModule: React.FC = () => {
       return;
     }
     const isUnit = recipe.unit === 'und';
-    const defaultQty = recipe.code === 'SUB-020'
-      ? 0.670
-      : recipe.code === 'SUB-021'
-      ? 0.920
-      : isUnit
-      ? 10
-      : 5.0;
+    const defaultQty = isUnit ? 1 : 1.0;
 
     setSelectedRecipes(prev => [
       ...prev,

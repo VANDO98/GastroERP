@@ -139,3 +139,32 @@ export async function saveCustomCategories(categories: string[]) {
   });
 }
 
+export async function fetchIngredientCategories() {
+  const res = await fetch(`${API_URL}/ingredient-categories`);
+  if (!res.ok) throw new Error('Error al obtener categorías de insumos');
+  return res.json();
+}
+
+export async function saveIngredientCategory(category: any) {
+  return fetch(`${API_URL}/ingredient-categories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(category)
+  });
+}
+
+export async function updateIngredientCategoryApi(id: string, category: any) {
+  return fetch(`${API_URL}/ingredient-categories/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(category)
+  });
+}
+
+export async function deleteIngredientCategoryApi(id: string) {
+  return fetch(`${API_URL}/ingredient-categories/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+

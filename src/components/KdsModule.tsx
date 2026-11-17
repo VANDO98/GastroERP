@@ -83,45 +83,35 @@ export const KdsModule: React.FC = () => {
       });
     }
 
-    // Inferencia por nombre si no tiene ingredientes de fruta explícitos en el BOM
+    // Inferencia dinámica por nombre si no tiene ingredientes de fruta explícitos en el BOM
     if (fruitIngs.length === 0) {
       const lower = item.name.toLowerCase();
-      if (lower.includes('surtido')) {
-        const mix = ingredients.find(i => i.id === 'sub-mix-surtido-fresco') || ingredients.find(i => i.id === 'ing-papaya');
-        if (mix && !fruitIngs.some(f => f.id === mix.id)) fruitIngs.push(mix);
-      } else if (lower.includes('mango')) {
-        const m = ingredients.find(i => i.id === 'sub-porcion-mango-fresco') || ingredients.find(i => i.id === 'ing-mango');
-        if (m && !fruitIngs.some(f => f.id === m.id)) fruitIngs.push(m);
-      } else if (lower.includes('fresa')) {
-        const f = ingredients.find(i => i.id === 'sub-porcion-fresa-limpia') || ingredients.find(i => i.id === 'ing-fresa');
-        if (f && !fruitIngs.some(f => f.id === f.id)) fruitIngs.push(f);
-      } else if (lower.includes('papaya')) {
-        const p = ingredients.find(i => i.id === 'sub-porcion-papaya-limpia') || ingredients.find(i => i.id === 'ing-papaya');
-        if (p && !fruitIngs.some(f => f.id === p.id)) fruitIngs.push(p);
-      } else if (lower.includes('piña') || lower.includes('pina')) {
-        const pi = ingredients.find(i => i.id === 'sub-porcion-pina-limpia') || ingredients.find(i => i.id === 'ing-pina');
-        if (pi && !fruitIngs.some(f => f.id === pi.id)) fruitIngs.push(pi);
+      const matchedFruit = ingredients.find(i =>
+        (i.category === 'frutas_verduras' || i.itemType === 'subreceta') &&
+        (lower.includes(i.name.toLowerCase().split(' ')[0].toLowerCase()) ||
+         (lower.includes('surtido') && (i.name.toLowerCase().includes('surtid') || i.name.toLowerCase().includes('mix'))))
+      );
+      if (matchedFruit && !fruitIngs.some(f => f.id === matchedFruit.id)) {
+        fruitIngs.push(matchedFruit);
       }
     }
 
     const pairs: FruitPulpPair[] = [];
 
     fruitIngs.forEach(freshIng => {
-      let pulpIng: typeof ingredients[0] | undefined;
       const lower = freshIng.name.toLowerCase();
       const idLower = freshIng.id.toLowerCase();
 
-      if (idLower.includes('surtid') || idLower.includes('mix') || lower.includes('surtid')) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-mixta');
-      } else if (idLower.includes('papaya') || lower.includes('papaya')) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-papaya');
-      } else if (idLower.includes('fresa') || lower.includes('fresa')) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-fresa');
-      } else if (idLower.includes('mango') || lower.includes('mango')) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-mango');
-      } else if (idLower.includes('pina') || lower.includes('pina') || lower.includes('piña')) {
-        pulpIng = ingredients.find(i => i.id === 'ing-pulpa-pina');
-      }
+      // Buscar pulpa equivalente en inventario según categoría pulpas_congeladas y coincidencia semántica
+      const fruitKeywords = ['surtid', 'mix', 'papaya', 'fresa', 'mango', 'piña', 'pina', 'maracuyá', 'maracuya', 'guanábana', 'lucuma', 'lúcuma'];
+      const matchedKey = fruitKeywords.find(k => lower.includes(k) || idLower.includes(k));
+
+      const pulpIng = matchedKey
+        ? ingredients.find(i =>
+            i.category === 'pulpas_congeladas' &&
+            (i.name.toLowerCase().includes(matchedKey) || i.id.toLowerCase().includes(matchedKey))
+          )
+        : undefined;
 
       // Si la fruta no tiene contraparte de pulpa en inventario (ej. plátano), se consume 100% fresca y no se genera toggle
       if (!pulpIng) {
@@ -331,6 +321,28 @@ export const KdsModule: React.FC = () => {
                                     <span>{ci.quantity * item.quantity}x {ci.name}</span>
                                   </div>
                                 ))}
+                              </div>
+                            )}
+
+                            {item.selectedSlots && item.selectedSlots.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1 pl-6">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                                  isLight ? 'bg-cyan-100 text-cyan-900 border-cyan-300' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                                }`}>
+                                  <span>🍨</span>
+                                  <span>Bolas: {item.selectedSlots.map(s => s.ingredientName).join(' + ')}</span>
+                                </span>
+                              </div>
+                            )}
+
+                            {item.selectedServing && (
+                              <div className="pl-6 mt-0.5">
+                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border inline-flex items-center gap-1 ${
+                                  isLight ? 'bg-slate-100 text-slate-700 border-slate-300' : 'bg-slate-800 text-slate-300 border-slate-700'
+                                }`}>
+                                  <span>📦</span>
+                                  <span>Servir en: {item.selectedServing.name}</span>
+                                </span>
                               </div>
                             )}
 

@@ -62,6 +62,7 @@ export const ToppingsMasterModule: React.FC = () => {
   const [portionUnit, setPortionUnit] = useState<MeasurementUnit>('kg');
   const [defaultPriceDelta, setDefaultPriceDelta] = useState<string>('1.50');
   const [isActive, setIsActive] = useState<boolean>(true);
+  const [hasVariants, setHasVariants] = useState<boolean>(false);
   const [ingSearchInput, setIngSearchInput] = useState<string>('');
   const [showIngSuggestions, setShowIngSuggestions] = useState<boolean>(false);
 
@@ -96,6 +97,7 @@ export const ToppingsMasterModule: React.FC = () => {
     setPortionQuantity('0.010');
     setDefaultPriceDelta('1.50');
     setIsActive(true);
+    setHasVariants(false);
     setShowIngSuggestions(false);
     setShowModal(true);
   };
@@ -108,6 +110,7 @@ export const ToppingsMasterModule: React.FC = () => {
     setPortionUnit(top.portionUnit);
     setDefaultPriceDelta(top.defaultPriceDelta.toString());
     setIsActive(top.isActive !== false);
+    setHasVariants(top.hasVariants || false);
     const linked = ingredients.find(i => i.id === top.ingredientId);
     setIngSearchInput(linked ? linked.name : '');
     setShowIngSuggestions(false);
@@ -136,6 +139,15 @@ export const ToppingsMasterModule: React.FC = () => {
     const priceDelta = parseFloat(defaultPriceDelta) || 0;
     const originType = detectedOriginType;
 
+    const defaultIceCreamAllowed = [
+      'ing-base-helado-vainilla',
+      'ing-helado-chocolate',
+      'ing-helado-fresa',
+      'ing-helado-lucuma',
+      'ing-helado-mango',
+      'ing-helado-maracuya'
+    ];
+
     if (editingId) {
       const existing = toppingsMaster.find(t => t.id === editingId);
       if (existing) {
@@ -147,7 +159,9 @@ export const ToppingsMasterModule: React.FC = () => {
           portionQuantity: qty,
           portionUnit,
           defaultPriceDelta: priceDelta,
-          isActive
+          isActive,
+          hasVariants,
+          allowedIngredientIds: hasVariants ? (existing.allowedIngredientIds || defaultIceCreamAllowed) : undefined
         });
       }
     } else {
@@ -158,7 +172,9 @@ export const ToppingsMasterModule: React.FC = () => {
         portionQuantity: qty,
         portionUnit,
         defaultPriceDelta: priceDelta,
-        isActive
+        isActive,
+        hasVariants,
+        allowedIngredientIds: hasVariants ? defaultIceCreamAllowed : undefined
       });
     }
 
@@ -286,6 +302,11 @@ export const ToppingsMasterModule: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <span className="text-amber-500">✨</span>
                           <span>{top.name}</span>
+                          {top.hasVariants && (
+                            <span className="text-[9px] bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded font-bold">
+                              🍨 Con Sabores
+                            </span>
+                          )}
                         </div>
                       </td>
 
@@ -501,6 +522,24 @@ export const ToppingsMasterModule: React.FC = () => {
                     <option value="und">Unidades (und)</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div>
+                  <span className="text-xs font-bold text-slate-200 block">¿Requiere elegir sabor o variante en POS?</span>
+                  <span className="text-[10px] text-slate-400">Ejemplo: Bola de Helado donde el cliente elige Vainilla, Chocolate, Lúcuma, etc.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setHasVariants(!hasVariants)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all ${
+                    hasVariants
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                >
+                  {hasVariants ? '✓ Con Selección' : '— Insumo Fijo'}
+                </button>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">

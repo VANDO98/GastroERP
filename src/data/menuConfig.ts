@@ -1027,7 +1027,9 @@ export const initialMenuConfig: MenuConfig = {
               "shortName": "Copa Helada",
               "description": "Helado cremoso con fresas Huacho picadas al momento y fudge",
               "price": 11.5,
-              "targetCost": 4.8,
+              "targetCost": 3.15,
+              "recipeType": "final",
+              "isActive": true,
               "ui": {
                 "color": "indigo",
                 "bgClass": "bg-indigo-500/20 hover:bg-indigo-500/30",
@@ -1044,6 +1046,24 @@ export const initialMenuConfig: MenuConfig = {
                   "ingredientId": "ing-fudge-chocolate",
                   "quantity": 0.025,
                   "unit": "kg"
+                },
+                {
+                  "id": "m-bola-extra",
+                  "label": "+ Bola Extra Helado",
+                  "priceDelta": 3,
+                  "toppingMasterId": "top-helado-vainilla",
+                  "ingredientId": "ing-base-helado-vainilla",
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "hasVariants": true,
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ]
                 }
               ],
               "recipeBom": [
@@ -1060,6 +1080,338 @@ export const initialMenuConfig: MenuConfig = {
                 {
                   "ingredientId": "ing-fudge-chocolate",
                   "quantity": 0.03,
+                  "unit": "kg"
+                },
+                {
+                  "ingredientId": "ing-vaso-domo-16oz",
+                  "quantity": 1,
+                  "unit": "und"
+                }
+              ]
+            },
+            {
+              "id": "prod-helado-simple",
+              "sku": "HEL-02",
+              "name": "Helado Simple (1 Bola)",
+              "shortName": "Helado Simple",
+              "description": "1 bola generosa de helado artesanal a elección (70ml) en barquillo o vasito",
+              "price": 5.0,
+              "targetCost": 1.09,
+              "recipeType": "final",
+              "isActive": true,
+              "ui": {
+                "color": "cyan",
+                "bgClass": "bg-cyan-500/20 hover:bg-cyan-500/30",
+                "borderClass": "border-cyan-500/40",
+                "textClass": "text-cyan-100",
+                "badgeClass": "bg-cyan-500/20 text-cyan-300"
+              },
+              "flavorSlots": [
+                {
+                  "slotIndex": 1,
+                  "label": "Sabor de Helado",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                }
+              ],
+              "servingOptions": [
+                { "id": "srv-cono", "name": "En Cono Barquillo", "ingredientId": "ing-cono-barquillo", "priceDelta": 0 },
+                { "id": "srv-vaso", "name": "En Vasito + Cucharita", "ingredientId": "ing-vaso-helado", "priceDelta": 0 }
+              ],
+              "quickModifiers": [
+                {
+                  "id": "m-extra-fudge",
+                  "label": "+ Fudge Casero",
+                  "priceDelta": 1,
+                  "toppingMasterId": "top-fudge",
+                  "ingredientId": "ing-fudge-chocolate",
+                  "quantity": 0.025,
+                  "unit": "kg"
+                },
+                {
+                  "id": "m-chantilly",
+                  "label": "+ Corona Chantilly",
+                  "priceDelta": 1.5,
+                  "toppingMasterId": "top-chantilly",
+                  "ingredientId": "ing-crema-chantilly",
+                  "quantity": 0.03,
+                  "unit": "kg"
+                }
+              ],
+              "recipeBom": []
+            },
+            {
+              "id": "prod-helado-doble",
+              "sku": "HEL-03",
+              "name": "Helado Doble (2 Bolas)",
+              "shortName": "Helado Doble",
+              "description": "2 bolas de helado artesanal combinables a elección (140ml) en barquillo o vasito",
+              "price": 9.0,
+              "targetCost": 1.86,
+              "recipeType": "final",
+              "isActive": true,
+              "ui": {
+                "color": "amber",
+                "bgClass": "bg-amber-500/20 hover:bg-amber-500/30",
+                "borderClass": "border-amber-500/40",
+                "textClass": "text-amber-100",
+                "badgeClass": "bg-amber-500/20 text-amber-300"
+              },
+              "flavorSlots": [
+                {
+                  "slotIndex": 1,
+                  "label": "Bola 1",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                },
+                {
+                  "slotIndex": 2,
+                  "label": "Bola 2",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                }
+              ],
+              "servingOptions": [
+                { "id": "srv-cono", "name": "En Cono Barquillo", "ingredientId": "ing-cono-barquillo", "priceDelta": 0 },
+                { "id": "srv-vaso", "name": "En Vasito + Cucharita", "ingredientId": "ing-vaso-helado", "priceDelta": 0 }
+              ],
+              "quickModifiers": [
+                {
+                  "id": "m-extra-fudge",
+                  "label": "+ Fudge Casero",
+                  "priceDelta": 1,
+                  "toppingMasterId": "top-fudge",
+                  "ingredientId": "ing-fudge-chocolate",
+                  "quantity": 0.025,
+                  "unit": "kg"
+                },
+                {
+                  "id": "m-chantilly",
+                  "label": "+ Corona Chantilly",
+                  "priceDelta": 1.5,
+                  "toppingMasterId": "top-chantilly",
+                  "ingredientId": "ing-crema-chantilly",
+                  "quantity": 0.03,
+                  "unit": "kg"
+                }
+              ],
+              "recipeBom": []
+            },
+            {
+              "id": "prod-helado-triple",
+              "sku": "HEL-04",
+              "name": "Helado Triple (3 Bolas)",
+              "shortName": "Helado Triple",
+              "description": "3 bolas de helado artesanal combinables a elección (210ml) en vasito o cono",
+              "price": 12.5,
+              "targetCost": 2.71,
+              "recipeType": "final",
+              "isActive": true,
+              "ui": {
+                "color": "rose",
+                "bgClass": "bg-rose-500/20 hover:bg-rose-500/30",
+                "borderClass": "border-rose-500/40",
+                "textClass": "text-rose-100",
+                "badgeClass": "bg-rose-500/20 text-rose-300"
+              },
+              "flavorSlots": [
+                {
+                  "slotIndex": 1,
+                  "label": "Bola 1",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                },
+                {
+                  "slotIndex": 2,
+                  "label": "Bola 2",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                },
+                {
+                  "slotIndex": 3,
+                  "label": "Bola 3",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                }
+              ],
+              "servingOptions": [
+                { "id": "srv-vaso", "name": "En Vasito + Cucharita", "ingredientId": "ing-vaso-helado", "priceDelta": 0 },
+                { "id": "srv-cono", "name": "En Cono Barquillo", "ingredientId": "ing-cono-barquillo", "priceDelta": 0 }
+              ],
+              "quickModifiers": [
+                {
+                  "id": "m-extra-fudge",
+                  "label": "+ Fudge Casero",
+                  "priceDelta": 1,
+                  "toppingMasterId": "top-fudge",
+                  "ingredientId": "ing-fudge-chocolate",
+                  "quantity": 0.025,
+                  "unit": "kg"
+                },
+                {
+                  "id": "m-chantilly",
+                  "label": "+ Corona Chantilly",
+                  "priceDelta": 1.5,
+                  "toppingMasterId": "top-chantilly",
+                  "ingredientId": "ing-crema-chantilly",
+                  "quantity": 0.03,
+                  "unit": "kg"
+                }
+              ],
+              "recipeBom": []
+            },
+            {
+              "id": "prod-banana-split",
+              "sku": "HEL-05",
+              "name": "Banana Split Clásica Sabor & Fruta",
+              "shortName": "Banana Split",
+              "description": "Plátano de seda entero con 3 bolas de helado a elección, fudge casero, corona de chantilly y barquillo",
+              "price": 16.5,
+              "targetCost": 4.35,
+              "recipeType": "final",
+              "isActive": true,
+              "ui": {
+                "color": "amber",
+                "bgClass": "bg-yellow-500/20 hover:bg-yellow-500/30",
+                "borderClass": "border-yellow-500/40",
+                "textClass": "text-yellow-100",
+                "badgeClass": "bg-yellow-500/20 text-yellow-300"
+              },
+              "flavorSlots": [
+                {
+                  "slotIndex": 1,
+                  "label": "Bola 1",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                },
+                {
+                  "slotIndex": 2,
+                  "label": "Bola 2",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                },
+                {
+                  "slotIndex": 3,
+                  "label": "Bola 3",
+                  "category": "lacteos",
+                  "allowedIngredientIds": [
+                    "ing-base-helado-vainilla",
+                    "ing-helado-chocolate",
+                    "ing-helado-fresa",
+                    "ing-helado-lucuma",
+                    "ing-helado-mango",
+                    "ing-helado-maracuya"
+                  ],
+                  "quantity": 0.07,
+                  "unit": "L",
+                  "required": true
+                }
+              ],
+              "quickModifiers": [
+                {
+                  "id": "m-extra-fudge",
+                  "label": "+ Extra Fudge",
+                  "priceDelta": 1,
+                  "toppingMasterId": "top-fudge",
+                  "ingredientId": "ing-fudge-chocolate",
+                  "quantity": 0.025,
+                  "unit": "kg"
+                }
+              ],
+              "recipeBom": [
+                {
+                  "ingredientId": "ing-platano",
+                  "quantity": 0.18,
+                  "unit": "kg"
+                },
+                {
+                  "ingredientId": "ing-fudge-chocolate",
+                  "quantity": 0.03,
+                  "unit": "kg"
+                },
+                {
+                  "ingredientId": "ing-crema-chantilly",
+                  "quantity": 0.025,
                   "unit": "kg"
                 },
                 {

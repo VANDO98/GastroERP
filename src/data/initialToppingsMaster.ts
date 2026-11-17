@@ -53,13 +53,23 @@ export const initialToppingsMaster: ToppingMaster[] = [
   },
   {
     id: 'top-helado-vainilla',
-    name: 'Bola de Helado Vainilla (70ml)',
+    name: 'Bola de Helado (70ml)',
     linkedItemType: 'insumo',
     ingredientId: 'ing-base-helado-vainilla',
     portionQuantity: 0.070,
     portionUnit: 'L',
     defaultPriceDelta: 3.00,
-    isActive: true
+    isActive: true,
+    hasVariants: true,
+    variantCategory: 'lacteos',
+    allowedIngredientIds: [
+      'ing-base-helado-vainilla',
+      'ing-helado-chocolate',
+      'ing-helado-fresa',
+      'ing-helado-lucuma',
+      'ing-helado-mango',
+      'ing-helado-maracuya'
+    ]
   },
   {
     id: 'top-mango-cubos',

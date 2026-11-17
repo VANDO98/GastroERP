@@ -15,13 +15,14 @@ import {
   Filter
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
-import type { Product, BomItem, QuickModifier } from '../types';
+import type { Product, BomItem, QuickModifier, FlavorSlotConfig, ServingOptionConfig } from '../types';
 import { SearchableSelect, type SearchableOption } from './SearchableSelect';
 
 export const RecipesModule: React.FC = () => {
   const {
     menuConfig,
     ingredients,
+    ingredientCategories,
     addNewProductRecipe,
     updateProductRecipe,
     addRecipeCategory,
@@ -99,6 +100,8 @@ export const RecipesModule: React.FC = () => {
   const [newProductType, setNewProductType] = useState<'final' | 'intermedia' | 'base'>('final');
   const [newProductYieldUnit, setNewProductYieldUnit] = useState<'kg' | 'L' | 'und'>('kg');
   const [newBomItems, setNewBomItems] = useState<BomItem[]>([]);
+  const [newFlavorSlots, setNewFlavorSlots] = useState<FlavorSlotConfig[]>([]);
+  const [newServingOptions, setNewServingOptions] = useState<ServingOptionConfig[]>([]);
 
   // Modal para Editar Receta Existente
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -107,6 +110,8 @@ export const RecipesModule: React.FC = () => {
   const [editProductPrice, setEditProductPrice] = useState<string>('');
   const [editProductDescription, setEditProductDescription] = useState<string>('');
   const [editBomItems, setEditBomItems] = useState<BomItem[]>([]);
+  const [editFlavorSlots, setEditFlavorSlots] = useState<FlavorSlotConfig[]>([]);
+  const [editServingOptions, setEditServingOptions] = useState<ServingOptionConfig[]>([]);
   const [editQuickModifiers, setEditQuickModifiers] = useState<QuickModifier[]>([]);
   const [newModLabel, setNewModLabel] = useState<string>('');
   const [newModPriceDelta, setNewModPriceDelta] = useState<string>('1.50');
@@ -146,12 +151,57 @@ export const RecipesModule: React.FC = () => {
     updateProductRecipe(updated);
   };
 
+  // Insumos elegibles para ranuras de helados o lácteos
+  const iceCreamIngredients = useMemo(() => {
+    return ingredients.filter(i =>
+      i.name.toLowerCase().includes('helado') ||
+      i.category?.toLowerCase() === 'lacteos' ||
+      i.category?.toLowerCase() === 'helados'
+    );
+  }, [ingredients]);
+
   // Calcular el costo BOM total de cualquier receta
   const calculateBomCost = (bomItems: BomItem[]) => {
     return bomItems.reduce((acc, bom) => {
       const ing = ingredients.find(i => i.id === bom.ingredientId);
       return acc + (ing ? ing.costPerUnit * bom.quantity : 0);
     }, 0);
+  };
+
+  // Categorías de insumos disponibles para vincular a los slots dinámicos (FILTRADAS EXCLUSIVAMENTE POR isSlotCategory === true)
+  const availableIngredientCategories = useMemo(() => {
+    const slotCats = (ingredientCategories || []).filter(c => c.isSlotCategory);
+    const activeCats = slotCats.length > 0
+      ? slotCats
+      : (ingredientCategories || []).filter(c => ['helados', 'panaderia', 'jarabes_bases'].includes(c.id));
+
+    return activeCats.map(c => ({
+      id: c.id,
+      label: `${c.icon || '🏷️'} ${c.label}`,
+      defaultUnit: c.defaultUnit || 'und',
+      defaultQty: Number(c.defaultQty) || 1
+    }));
+  }, [ingredientCategories]);
+
+  // Calcular el costo proyectado individual de un slot según los insumos permitidos o su categoría
+  const calculateSlotCost = (slot: FlavorSlotConfig) => {
+    let allowed: typeof ingredients = [];
+    if (slot.allowedIngredientIds && slot.allowedIngredientIds.length > 0) {
+      allowed = ingredients.filter(i => slot.allowedIngredientIds!.includes(i.id));
+    } else if (slot.category && slot.category !== 'todas') {
+      allowed = ingredients.filter(i => i.category === slot.category);
+    } else {
+      allowed = ingredients.filter(i => i.category === 'helados');
+    }
+    const avg = allowed.length > 0
+      ? allowed.reduce((sum, ing) => sum + ing.costPerUnit, 0) / allowed.length
+      : (slot.unit === 'und' ? 0.50 : 11.0);
+    return Number((avg * slot.quantity).toFixed(2));
+  };
+
+  // Costo proyectado total de ranuras de sabores variables
+  const calculateSlotsCost = (slots: FlavorSlotConfig[] = []) => {
+    return slots.reduce((acc, slot) => acc + calculateSlotCost(slot), 0);
   };
 
   // Categorías completas del menú (con iconos y pertenencia a línea)
@@ -214,7 +264,8 @@ export const RecipesModule: React.FC = () => {
       })
     : [];
 
-  const edibleCost = calculateBomCost(edibleBomItems);
+  const slotsCost = calculateSlotsCost(selectedProduct?.flavorSlots || []);
+  const edibleCost = calculateBomCost(edibleBomItems) + slotsCost;
   const disposablesCost = calculateBomCost(disposableBomItems);
   const totalBOMCost = edibleCost + disposablesCost;
 
@@ -236,6 +287,8 @@ export const RecipesModule: React.FC = () => {
     setEditProductPrice(prod.price.toString());
     setEditProductDescription(prod.description || '');
     setEditBomItems([...prod.recipeBom]);
+    setEditFlavorSlots(prod.flavorSlots ? [...prod.flavorSlots] : []);
+    setEditServingOptions(prod.servingOptions ? [...prod.servingOptions] : []);
     setEditQuickModifiers(prod.quickModifiers ? [...prod.quickModifiers] : []);
     setShowEditModal(true);
   };
@@ -264,13 +317,14 @@ export const RecipesModule: React.FC = () => {
 
   const handleSaveEditedRecipe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedProduct || !editProductName.trim() || editBomItems.length === 0) return;
+    if (!selectedProduct || !editProductName.trim() || (editBomItems.length === 0 && editFlavorSlots.length === 0)) return;
 
     const newEdibleItems = editBomItems.filter(b => {
       const ing = ingredients.find(i => i.id === b.ingredientId);
       return !b.isDisposable && ing?.itemType !== 'descartable';
     });
-    const newCost = calculateBomCost(newEdibleItems);
+    const editSlotsCost = calculateSlotsCost(editFlavorSlots);
+    const newCost = calculateBomCost(newEdibleItems) + editSlotsCost;
     const updatedProd: Product = {
       ...selectedProduct,
       name: editProductName.trim(),
@@ -279,7 +333,9 @@ export const RecipesModule: React.FC = () => {
       price: parseFloat(editProductPrice) || selectedProduct.price,
       targetCost: newCost,
       quickModifiers: editQuickModifiers,
-      recipeBom: editBomItems
+      recipeBom: editBomItems,
+      flavorSlots: editFlavorSlots.length > 0 ? editFlavorSlots : undefined,
+      servingOptions: editServingOptions.length > 0 ? editServingOptions : undefined
     };
 
     updateProductRecipe(updatedProd);
@@ -313,8 +369,9 @@ export const RecipesModule: React.FC = () => {
     const ing = ingredients.find(i => i.id === b.ingredientId);
     return !b.isDisposable && ing?.itemType !== 'descartable';
   });
-  const newRecipeEdibleCost = calculateBomCost(newRecipeEdibleItems);
-  const newRecipeCost = calculateBomCost(newBomItems);
+  const newRecipeSlotsCost = calculateSlotsCost(newFlavorSlots);
+  const newRecipeEdibleCost = calculateBomCost(newRecipeEdibleItems) + newRecipeSlotsCost;
+  const newRecipeCost = calculateBomCost(newBomItems) + newRecipeSlotsCost;
   const newRecipeSuggestedPrice30 = newRecipeEdibleCost > 0 ? Number((newRecipeEdibleCost / 0.30).toFixed(2)) : 0;
   const newRecipeFloorPrice45 = newRecipeEdibleCost > 0 ? Number((newRecipeEdibleCost / 0.45).toFixed(2)) : 0;
 
@@ -326,13 +383,15 @@ export const RecipesModule: React.FC = () => {
     setNewProductPrice('12.00');
     setNewProductType('final');
     setNewBomItems([]);
+    setNewFlavorSlots([]);
+    setNewServingOptions([]);
     setShowNewRecipeModal(true);
   };
 
   // Guardar nueva receta y añadirla al menú
   const handleSaveRecipe = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProductName.trim() || newBomItems.length === 0) return;
+    if (!newProductName.trim() || (newBomItems.length === 0 && newFlavorSlots.length === 0)) return;
 
     const isSub = newProductType === 'base' || newProductType === 'intermedia';
     const finalSku = newProductSku.trim() || generateNextSku(newProductType, newProductLine);
@@ -364,7 +423,9 @@ export const RecipesModule: React.FC = () => {
         { id: 'm-sin-azucar', label: 'Sin Azúcar', priceDelta: 0 },
         { id: 'm-llevar', label: 'Para Llevar', priceDelta: 0.5 }
       ],
-      recipeBom: newBomItems
+      recipeBom: newBomItems,
+      flavorSlots: newFlavorSlots.length > 0 ? newFlavorSlots : undefined,
+      servingOptions: newServingOptions.length > 0 ? newServingOptions : undefined
     };
 
     addNewProductRecipe(newProd, isSub ? 'linea-caliente' : newProductLine, isSub ? 'cat-subrecetas-base' : newProductCategoryId);
@@ -781,6 +842,60 @@ export const RecipesModule: React.FC = () => {
               </div>
             </div>
 
+            {/* SECCIÓN INTERMEDIA: Ranuras de Insumo Variable / A Elección (si aplica) */}
+            {selectedProduct.flavorSlots && selectedProduct.flavorSlots.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                    <span>✨</span> Opciones & Variantes a Elección ({selectedProduct.flavorSlots.length} ranuras)
+                  </h4>
+                  <span className="text-[11px] font-bold text-cyan-400 font-mono">
+                    Costo Proyectado: S/ {slotsCost.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className={`border rounded-2xl overflow-hidden divide-y ${isLight ? 'border-cyan-200 divide-cyan-100' : 'border-cyan-900/40 divide-cyan-900/30'}`}>
+                  {selectedProduct.flavorSlots.map((slot, sIdx) => {
+                    const slotCost = calculateSlotCost(slot);
+                    return (
+                      <div
+                        key={sIdx}
+                        className={`px-4 py-2.5 text-xs flex items-center justify-between transition-colors ${
+                          isLight ? 'bg-white hover:bg-cyan-50/50 text-slate-800' : 'bg-slate-950/40 hover:bg-slate-800/30 text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center text-[10px]">
+                            {slot.slotIndex + 1}
+                          </span>
+                          <div>
+                            <div className="font-bold flex items-center gap-1.5">
+                              <span>{slot.label}</span>
+                              <span className="text-[9px] bg-cyan-500/15 text-cyan-400 px-1.5 py-0.2 rounded font-mono font-semibold">
+                                {slot.category === 'panaderia' ? '🥖 Panadería' : slot.category === 'lacteos' ? '🍨 Helados/Lácteos' : slot.category || 'Variantes'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                              Elección obligatoria en la comanda del POS
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-cyan-400 font-mono">
+                            {slot.quantity} {slot.unit}
+                          </span>
+                          <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                            ~S/ {slotCost.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* SECCIÓN 2: Descartables Asociados (Para Llevar / Delivery) */}
             <div className="space-y-2 pt-2">
               <h4 className={`text-xs font-black uppercase tracking-wider flex items-center justify-between ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
@@ -1119,6 +1234,170 @@ export const RecipesModule: React.FC = () => {
                 </div>
               </div>
 
+              {/* SECCIÓN OPCIONAL: Ranuras de Insumo Variable / A Elección del Cliente (Panes, Helados, Leches, Jarabes, etc.) */}
+              {newProductType === 'final' && (
+                <div className="p-3.5 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+                        <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextIdx = newFlavorSlots.length;
+                        const defaultCat = newProductLine === 'linea-caliente' ? 'panaderia' : 'helados';
+                        const catConfig = availableIngredientCategories.find(c => c.id === defaultCat) || availableIngredientCategories[0] || { defaultQty: 1, defaultUnit: 'und' };
+                        const defaultAllowed = ingredients.filter(i => i.category === defaultCat).map(i => i.id);
+
+                        setNewFlavorSlots(prev => [
+                          ...prev,
+                          {
+                            slotIndex: nextIdx,
+                            label: defaultCat === 'panaderia' ? 'Tipo de Pan' : defaultCat === 'helados' ? `Bola ${nextIdx + 1}` : 'Opción a Elección',
+                            category: defaultCat,
+                            quantity: catConfig.defaultQty,
+                            unit: catConfig.defaultUnit as any,
+                            required: true,
+                            allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
+                          }
+                        ]);
+                      }}
+                      className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Añadir Opción Variable</span>
+                    </button>
+                  </div>
+
+                  {newFlavorSlots.length > 0 && (
+                    <div className="space-y-3 pt-1">
+                      {newFlavorSlots.map((slot, sIdx) => {
+                        const slotCost = calculateSlotCost(slot);
+                        const currentCat = slot.category || 'todas';
+                        const categoryIngredients = currentCat === 'todas'
+                          ? ingredients
+                          : ingredients.filter(i => i.category === currentCat);
+
+                        return (
+                          <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                              {/* Nombre de la Ranura */}
+                              <div className="flex items-center gap-2 flex-1">
+                                <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
+                                <input
+                                  type="text"
+                                  value={slot.label}
+                                  onChange={e => {
+                                    const val = e.target.value;
+                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
+                                  }}
+                                  className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
+                                  placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
+                                />
+                              </div>
+
+                              {/* Selector de Categoría Vinculada */}
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
+                                <select
+                                  value={currentCat}
+                                  onChange={e => {
+                                    const newCat = e.target.value;
+                                    const catConf = availableIngredientCategories.find(c => c.id === newCat);
+                                    const allowed = newCat === 'todas'
+                                      ? undefined
+                                      : ingredients.filter(i => i.category === newCat).map(i => i.id);
+
+                                    setNewFlavorSlots(prev => prev.map((s, i) => {
+                                      if (i !== sIdx) return s;
+                                      return {
+                                        ...s,
+                                        category: newCat,
+                                        quantity: catConf?.defaultQty || s.quantity,
+                                        unit: (catConf?.defaultUnit as any) || s.unit,
+                                        label: s.label === 'Bola 1' && newCat === 'panaderia' ? 'Tipo de Pan' : s.label,
+                                        allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
+                                      };
+                                    }));
+                                  }}
+                                  className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
+                                >
+                                  {availableIngredientCategories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>
+                                      {cat.label}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setNewFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
+                                  }}
+                                  className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
+                                  title="Eliminar ranura"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Porción, Unidad y Resumen de Opciones */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-400">Porción descontada:</span>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  value={slot.quantity}
+                                  onChange={e => {
+                                    const val = parseFloat(e.target.value) || 0;
+                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
+                                  }}
+                                  className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
+                                />
+                                <select
+                                  value={slot.unit}
+                                  onChange={e => {
+                                    const u = e.target.value as any;
+                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
+                                  }}
+                                  className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                                >
+                                  <option value="und">und</option>
+                                  <option value="L">L</option>
+                                  <option value="kg">kg</option>
+                                  <option value="ml">ml</option>
+                                  <option value="g">g</option>
+                                </select>
+                                <span className="text-emerald-400 font-mono font-bold">
+                                  ~S/ {slotCost.toFixed(2)} / porción
+                                </span>
+                              </div>
+
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                <span className="text-cyan-400 font-bold">
+                                  {categoryIngredients.length} insumos elegibles:
+                                </span>
+                                <span className="truncate max-w-[200px] text-slate-300">
+                                  {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
+                                  {categoryIngredients.length > 3 ? '...' : ''}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Calculadora en vivo del Precio Sugerido */}
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs">
                 <div>
@@ -1144,7 +1423,7 @@ export const RecipesModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!newProductName.trim() || newBomItems.length === 0}
+                  disabled={!newProductName.trim() || (newBomItems.length === 0 && newFlavorSlots.length === 0)}
                   className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20"
                 >
                   GUARDAR & PUBLICAR RECETA
@@ -1506,14 +1785,177 @@ export const RecipesModule: React.FC = () => {
                 </div>
               </div>
 
+              {/* SECCIÓN OPCIONAL: Ranuras de Insumo Variable / A Elección del Cliente (Panes, Helados, Leches, Jarabes, etc.) */}
+              <div className="p-3.5 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
+                      <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
+                    </h4>
+                    <p className="text-[10px] text-slate-400">
+                      Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextIdx = editFlavorSlots.length;
+                      const defaultCat = selectedProduct.sku.startsWith('SAN-') ? 'panaderia' : 'helados';
+                      const catConfig = availableIngredientCategories.find(c => c.id === defaultCat) || availableIngredientCategories[0] || { defaultQty: 1, defaultUnit: 'und' };
+                      const defaultAllowed = ingredients.filter(i => i.category === defaultCat).map(i => i.id);
+
+                      setEditFlavorSlots(prev => [
+                        ...prev,
+                        {
+                          slotIndex: nextIdx,
+                          label: defaultCat === 'panaderia' ? 'Tipo de Pan' : defaultCat === 'helados' ? `Bola ${nextIdx + 1}` : 'Opción a Elección',
+                          category: defaultCat,
+                          quantity: catConfig.defaultQty,
+                          unit: catConfig.defaultUnit as any,
+                          required: true,
+                          allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
+                        }
+                      ]);
+                    }}
+                    className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Añadir Opción Variable</span>
+                  </button>
+                </div>
+
+                {editFlavorSlots.length > 0 && (
+                  <div className="space-y-3 pt-1">
+                    {editFlavorSlots.map((slot, sIdx) => {
+                      const slotCost = calculateSlotCost(slot);
+                      const currentCat = slot.category || 'todas';
+                      const categoryIngredients = currentCat === 'todas'
+                        ? ingredients
+                        : ingredients.filter(i => i.category === currentCat);
+
+                      return (
+                        <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                            {/* Nombre de la Ranura */}
+                            <div className="flex items-center gap-2 flex-1">
+                              <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
+                              <input
+                                type="text"
+                                value={slot.label}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
+                                }}
+                                className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
+                                placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
+                              />
+                            </div>
+
+                            {/* Selector de Categoría Vinculada */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
+                              <select
+                                value={currentCat}
+                                onChange={e => {
+                                  const newCat = e.target.value;
+                                  const catConf = availableIngredientCategories.find(c => c.id === newCat);
+                                  const allowed = newCat === 'todas'
+                                    ? undefined
+                                    : ingredients.filter(i => i.category === newCat).map(i => i.id);
+
+                                  setEditFlavorSlots(prev => prev.map((s, i) => {
+                                    if (i !== sIdx) return s;
+                                    return {
+                                      ...s,
+                                      category: newCat,
+                                      quantity: catConf?.defaultQty || s.quantity,
+                                      unit: (catConf?.defaultUnit as any) || s.unit,
+                                      label: s.label === 'Bola 1' && newCat === 'panaderia' ? 'Tipo de Pan' : s.label,
+                                      allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
+                                    };
+                                  }));
+                                }}
+                                className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
+                              >
+                                {availableIngredientCategories.map(cat => (
+                                  <option key={cat.id} value={cat.id}>
+                                    {cat.label}
+                                  </option>
+                                ))}
+                              </select>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
+                                }}
+                                className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
+                                title="Eliminar ranura"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Porción, Unidad y Resumen de Opciones */}
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400">Porción descontada:</span>
+                              <input
+                                type="number"
+                                step="any"
+                                value={slot.quantity}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
+                                }}
+                                className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
+                              />
+                              <select
+                                value={slot.unit}
+                                onChange={e => {
+                                  const u = e.target.value as any;
+                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
+                                }}
+                                className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                              >
+                                <option value="und">und</option>
+                                <option value="L">L</option>
+                                <option value="kg">kg</option>
+                                <option value="ml">ml</option>
+                                <option value="g">g</option>
+                              </select>
+                              <span className="text-emerald-400 font-mono font-bold">
+                                ~S/ {slotCost.toFixed(2)} / porción
+                              </span>
+                            </div>
+
+                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                              <span className="text-cyan-400 font-bold">
+                                {categoryIngredients.length} insumos elegibles:
+                              </span>
+                              <span className="truncate max-w-[200px] text-slate-300">
+                                {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
+                                {categoryIngredients.length > 3 ? '...' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Métricas Recalculadas en la Edición */}
               {(() => {
                 const editedEdibleItems = editBomItems.filter(b => {
                   const ing = ingredients.find(i => i.id === b.ingredientId);
                   return !b.isDisposable && ing?.itemType !== 'descartable';
                 });
-                const editedEdibleCost = calculateBomCost(editedEdibleItems);
-                const editedCost = calculateBomCost(editBomItems);
+                const editSlotsCost = calculateSlotsCost(editFlavorSlots);
+                const editedEdibleCost = calculateBomCost(editedEdibleItems) + editSlotsCost;
+                const editedCost = calculateBomCost(editBomItems) + editSlotsCost;
                 const editedSuggested30 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.30).toFixed(2)) : 0;
                 const editedFloor45 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.45).toFixed(2)) : 0;
                 const editedPriceNum = parseFloat(editProductPrice) || 0;
@@ -1552,7 +1994,7 @@ export const RecipesModule: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={!editProductName.trim() || editBomItems.length === 0}
+                  disabled={!editProductName.trim() || (editBomItems.length === 0 && editFlavorSlots.length === 0)}
                   className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20"
                 >
                   ACTUALIZAR RECETA

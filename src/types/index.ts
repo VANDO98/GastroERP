@@ -14,6 +14,16 @@ export interface InventoryBatch {
   unitCost: number; // Costo por kg, L o und en PEN
 }
 
+export interface IngredientCategory {
+  id: string;
+  name: string;
+  label: string;
+  icon?: string;
+  defaultUnit: MeasurementUnit;
+  defaultQty: number;
+  isSlotCategory: boolean;
+}
+
 export interface Ingredient {
   id: string;
   code: string;
@@ -52,6 +62,25 @@ export interface QuickModifier {
   quantity?: number;         // Porción que descuenta
   unit?: MeasurementUnit;
   inventoryImpact?: ModifierInventoryImpact[];
+  hasVariants?: boolean;
+  allowedIngredientIds?: string[];
+}
+
+export interface FlavorSlotConfig {
+  slotIndex: number;
+  label: string; // ej. "Bola 1", "Bola 2", "Bola 3"
+  category?: string;
+  allowedIngredientIds?: string[];
+  quantity: number; // ej. 0.07
+  unit: MeasurementUnit; // ej. 'L'
+  required?: boolean;
+}
+
+export interface ServingOptionConfig {
+  id: string;
+  name: string; // ej. "En Cono Barquillo" | "En Vasito + Cucharita"
+  ingredientId?: string;
+  priceDelta?: number;
 }
 
 export interface ProductUiConfig {
@@ -78,6 +107,8 @@ export interface Product {
   ui: ProductUiConfig;
   quickModifiers: QuickModifier[];
   recipeBom: BomItem[];
+  flavorSlots?: FlavorSlotConfig[];
+  servingOptions?: ServingOptionConfig[];
 }
 
 export interface Category {
@@ -117,6 +148,24 @@ export interface OrderItemModifier {
   ingredientId?: string;
   quantity?: number;
   unit?: MeasurementUnit;
+  selectedVariantIngredientId?: string;
+  selectedVariantName?: string;
+}
+
+export interface SelectedFlavorSlot {
+  slotIndex: number;
+  slotLabel: string;
+  ingredientId: string;
+  ingredientName: string;
+  quantity: number;
+  unit: MeasurementUnit;
+}
+
+export interface SelectedServing {
+  id: string;
+  name: string;
+  ingredientId?: string;
+  priceDelta?: number;
 }
 
 export interface OrderItem {
@@ -126,6 +175,8 @@ export interface OrderItem {
   price: number;
   quantity: number;
   selectedModifiers: OrderItemModifier[];
+  selectedSlots?: SelectedFlavorSlot[];
+  selectedServing?: SelectedServing;
   notes?: string;
   itemTotal: number;
   recipeBom: BomItem[];
@@ -367,11 +418,14 @@ export interface ToppingMaster {
   id: string;
   name: string; // Ej. "Mango en Cubitos (10g)", "Chantilly Casero (40g)"
   linkedItemType: 'insumo' | 'subreceta';
-  ingredientId: string; // ID del insumo o subreceta en almacén
-  portionQuantity: number; // Cantidad a descontar en stock (ej. 0.010 para 10g)
+  ingredientId: string; // ID del insumo o subreceta en almacén por defecto
+  portionQuantity: number; // Cantidad a descontar en stock (ej. 0.010 para 10g o 0.070 para 70ml)
   portionUnit: MeasurementUnit; // kg, L, und
   defaultPriceDelta: number; // Recargo en soles (ej. 1.50)
   isActive: boolean;
+  hasVariants?: boolean;
+  variantCategory?: string; // ej. 'lacteos', 'helados'
+  allowedIngredientIds?: string[]; // IDs de insumos específicos permitidos para este topping
 }
 
 // Configuración de Mesas del Local
