@@ -30,6 +30,7 @@ export interface Ingredient {
   name: string;
   itemType: ItemType; // 'insumo', 'subreceta', 'descartable', 'consumible'
   category?: string; // frutas, lacteos, abarrotes, o categoría personalizada creada por el usuario
+  icon?: string; // Emoji o icono visual opcional (ej. 🍦, 🍞, 🧀)
   unit: MeasurementUnit;
   stock: number; // Suma de remainingQty en lotes
   minStock: number;
@@ -63,6 +64,7 @@ export interface QuickModifier {
   unit?: MeasurementUnit;
   inventoryImpact?: ModifierInventoryImpact[];
   hasVariants?: boolean;
+  variantCategory?: string; // Categoría de insumos para variantes dinámicas
   allowedIngredientIds?: string[];
 }
 
@@ -119,9 +121,9 @@ export interface Category {
 }
 
 export interface MenuLine {
-  id: 'linea-fria' | 'linea-caliente';
+  id: string; // ej. 'linea-fria', 'linea-caliente', 'cafeteria', 'bar', o creada por el usuario
   name: string;
-  theme: {
+  theme?: {
     accentColor: string;
     badgeColor: string;
     activeTabClass: string;
@@ -417,6 +419,7 @@ export interface PurchaseOrder {
 export interface ToppingMaster {
   id: string;
   name: string; // Ej. "Mango en Cubitos (10g)", "Chantilly Casero (40g)"
+  category?: string;
   linkedItemType: 'insumo' | 'subreceta';
   ingredientId: string; // ID del insumo o subreceta en almacén por defecto
   portionQuantity: number; // Cantidad a descontar en stock (ej. 0.010 para 10g o 0.070 para 70ml)

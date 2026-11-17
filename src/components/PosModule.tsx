@@ -22,7 +22,7 @@ export const PosModule: React.FC = () => {
   const [inspectingTable, setInspectingTable] = useState<TableOrder | null>(null);
 
   const activeTable = tables.find(t => t.tableId === activeTableId) || tables[0];
-  const [selectedLineId, setSelectedLineId] = useState<'linea-fria' | 'linea-caliente' | 'combos'>('linea-fria');
+  const [selectedLineId, setSelectedLineId] = useState<string>(menuConfig.lines[0]?.id || 'linea-fria');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeProductForModal, setActiveProductForModal] = useState<Product | null>(null);
   const [tempModifiers, setTempModifiers] = useState<(QuickModifier & { selectedVariantIngredientId?: string; selectedVariantName?: string })[]>([]);
@@ -59,8 +59,8 @@ export const PosModule: React.FC = () => {
 
   const activeLine = menuConfig.lines.find(l => l.id === selectedLineId) || menuConfig.lines[0];
   const rawProducts = selectedCategoryId === 'all'
-    ? activeLine.categories.flatMap(c => c.products)
-    : activeLine.categories.find(c => c.id === selectedCategoryId)?.products || [];
+    ? (activeLine ? activeLine.categories.flatMap(c => c.products) : [])
+    : (activeLine ? activeLine.categories.find(c => c.id === selectedCategoryId)?.products || [] : []);
 
   // En el POS de salón/mesas NO deben salir subrecetas de producción (SUB-xxx / recipeType==='base') ni recetas inactivas/pausadas
   const displayedProducts = rawProducts.filter(p => {
@@ -179,33 +179,17 @@ export const PosModule: React.FC = () => {
 
   const getFlavorInfo = (ingredientId: string, requiredQuantity: number = 0.001) => {
     const ing = ingredients.find(i => i.id === ingredientId);
-    let emoji = '📦';
-    if (ing) {
-      const lower = ing.name.toLowerCase();
-      if (lower.includes('vainilla')) emoji = '🍦';
-      else if (lower.includes('chocolate')) emoji = '🍫';
-      else if (lower.includes('fresa')) emoji = '🍓';
-      else if (lower.includes('lucuma') || lower.includes('lúcuma')) emoji = '🍈';
-      else if (lower.includes('mango')) emoji = '🥭';
-      else if (lower.includes('maracuya') || lower.includes('maracuyá')) emoji = '🌴';
-      else if (lower.includes('pan') || lower.includes('ciabatta') || lower.includes('frances') || lower.includes('francés') || lower.includes('croissant') || lower.includes('brioche') || lower.includes('molde')) emoji = '🥖';
-      else if (lower.includes('leche')) emoji = '🥛';
-      else if (lower.includes('fudge') || lower.includes('jarabe') || lower.includes('miel') || lower.includes('algarrobina')) emoji = '🍯';
-      else if (lower.includes('queso') || lower.includes('edam')) emoji = '🧀';
-      else if (lower.includes('jamon') || lower.includes('jamón') || lower.includes('pollo') || lower.includes('pavo')) emoji = '🥩';
-      else {
-        const cat = ingredientCategories.find(c => c.id === ing.category || c.name === ing.category);
-        if (cat?.icon) emoji = cat.icon;
-      }
-    }
+    const cat = ing?.category ? ingredientCategories.find(c => c.id === ing.category || c.name === ing.category) : null;
+    const emoji = ing?.icon || cat?.icon || '📦';
     return {
       ing,
       id: ingredientId,
-      name: ing?.name.replace(/^(Helado |Pan )/i, '') || ingredientId,
+      name: ing?.name || ingredientId,
       fullName: ing?.name || ingredientId,
       emoji,
       stock: ing?.stock || 0,
       unit: ing?.unit || 'und',
+      cost: ing?.costPerUnit || 0,
       isAvailable: (ing?.stock || 0) >= Math.max(requiredQuantity, 0.001)
     };
   };
@@ -343,14 +327,15 @@ export const PosModule: React.FC = () => {
         return;
       }
 
-      const allowedIngredientIds = mod.allowedIngredientIds || masterTop?.allowedIngredientIds || [
-        'ing-base-helado-vainilla',
-        'ing-helado-chocolate',
-        'ing-helado-fresa',
-        'ing-helado-lucuma',
-        'ing-helado-mango',
-        'ing-helado-maracuya'
-      ];
+      let allowedIngredientIds = mod.allowedIngredientIds || masterTop?.allowedIngredientIds;
+      if (!allowedIngredientIds || allowedIngredientIds.length === 0) {
+        const targetCategory = mod.variantCategory || masterTop?.variantCategory || masterTop?.category || (mod.label.toLowerCase().includes('helado') ? 'helados' : mod.label.toLowerCase().includes('pan') ? 'panaderia' : undefined);
+        if (targetCategory) {
+          allowedIngredientIds = ingredients.filter(i => i.category === targetCategory).map(i => i.id);
+        } else {
+          allowedIngredientIds = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+        }
+      }
 
       setVariantPickingMod({
         ...mod,
@@ -515,7 +500,7 @@ export const PosModule: React.FC = () => {
   // El botón solo se activa si hay productos y al menos uno está pendiente de envío a barra
   const canSendToKitchen = unsentItemsCount > 0;
   return (
-    <div className={'flex-1 flex flex-col h-[calc(100vh-62px)] overflow-hidden ' + (isLight ? 'bg-slate-100 text-slate-900 font-sans' : 'bg-slate-950 text-slate-100')}>
+    <div className={'flex-1 flex flex-col h-full overflow-hidden min-h-0 ' + (isLight ? 'bg-slate-100 text-slate-900 font-sans' : 'bg-slate-950 text-slate-100')}>
       
       {/* ========================================================================= */}
       {/* MODO 1: MAPA GENERAL DE MESAS EN TARJETAS GRANDES */}
@@ -719,7 +704,7 @@ export const PosModule: React.FC = () => {
       {/* MODO 2: TOMA DE PEDIDOS (CATÁLOGO + COMANDA LATERAL) */}
       {/* ========================================================================= */}
       {posViewMode === 'order' && (
-        <div className="flex-1 flex flex-col h-full overflow-hidden animate-in fade-in">
+        <div className="flex-1 flex flex-col h-full overflow-hidden min-h-0 animate-in fade-in">
           {/* Barra Superior de Navegación: Botón Regresar a Mesas + Estado de Mesa Activa */}
           <div className={'px-3 py-2 border-b flex items-center justify-between gap-2 ' + (isLight ? 'bg-white border-slate-300' : 'bg-slate-900/90 border-slate-800')}>
             <div className="flex items-center gap-3">
@@ -793,34 +778,45 @@ export const PosModule: React.FC = () => {
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        <div className={`flex-1 flex flex-col overflow-hidden border-r ${
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        <div className={`flex-1 flex flex-col overflow-hidden min-h-0 border-r ${
           isLight ? 'border-slate-300' : 'border-slate-800'
         } ${mobileTab === 'comanda' ? 'hidden lg:flex' : 'flex'}`}>
           <div className={'p-3 border-b flex items-center justify-between gap-3 ' + (isLight ? 'bg-slate-200/70 border-slate-300' : 'bg-slate-900/60 border-slate-800')}>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => { setSelectedLineId('linea-fria'); setSelectedCategoryId('all'); }}
-                className={'flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs md:text-sm tracking-wide transition-all shadow ' +
-                  (selectedLineId === 'linea-fria' ? 'bg-cyan-600 text-white shadow-cyan-600/30 ring-2 ring-cyan-400' : isLight ? 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300' : 'bg-slate-800 text-slate-300 hover:bg-slate-700')}
-              >
-                ❄ Línea Fría
-              </button>
-              <button
-                onClick={() => { setSelectedLineId('linea-caliente'); setSelectedCategoryId('all'); }}
-                className={'flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs md:text-sm tracking-wide transition-all shadow ' +
-                  (selectedLineId === 'linea-caliente' ? 'bg-rose-600 text-white shadow-rose-600/30 ring-2 ring-rose-400' : isLight ? 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300' : 'bg-slate-800 text-slate-300 hover:bg-slate-700')}
-              >
-                🔥 Línea Caliente
-              </button>
-              <button
-                onClick={() => { setSelectedLineId('combos'); setSelectedCategoryId('all'); }}
-                className={'flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs md:text-sm tracking-wide transition-all shadow ' +
-                  (selectedLineId === 'combos' ? 'bg-amber-600 text-white shadow-amber-600/30 ring-2 ring-amber-400' : isLight ? 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300' : 'bg-slate-800 text-slate-300 hover:bg-slate-700')}
-              >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>✨ Combos & Promos</span>
-              </button>
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+              {menuConfig.lines.map(line => {
+                const isSelected = selectedLineId === line.id;
+                const defaultActiveStyle = line.id === 'linea-fria'
+                  ? 'bg-cyan-600 text-white shadow-cyan-600/30 ring-2 ring-cyan-400'
+                  : line.id === 'linea-caliente'
+                  ? 'bg-rose-600 text-white shadow-rose-600/30 ring-2 ring-rose-400'
+                  : 'bg-orange-600 text-white shadow-orange-600/30 ring-2 ring-orange-400';
+
+                return (
+                  <button
+                    key={line.id}
+                    onClick={() => { setSelectedLineId(line.id); setSelectedCategoryId('all'); }}
+                    className={'flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs md:text-sm tracking-wide transition-all shadow shrink-0 ' +
+                      (isSelected
+                        ? (line.theme?.activeTabClass || defaultActiveStyle)
+                        : isLight
+                        ? 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700')}
+                  >
+                    <span>{line.name}</span>
+                  </button>
+                );
+              })}
+              {combos.filter(c => c.isActive).length > 0 && (
+                <button
+                  onClick={() => { setSelectedLineId('combos'); setSelectedCategoryId('all'); }}
+                  className={'flex items-center gap-2 px-3.5 py-2 rounded-2xl font-black text-xs md:text-sm tracking-wide transition-all shadow shrink-0 ' +
+                    (selectedLineId === 'combos' ? 'bg-amber-600 text-white shadow-amber-600/30 ring-2 ring-amber-400' : isLight ? 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-300' : 'bg-slate-800 text-slate-300 hover:bg-slate-700')}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>✨ Combos & Promos</span>
+                </button>
+              )}
             </div>
             <div className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-slate-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -957,7 +953,7 @@ export const PosModule: React.FC = () => {
             )}
           </div>
         </div>
-        <div className={`w-full lg:w-96 flex flex-col justify-between border-t lg:border-t-0 lg:border-l shadow-2xl flex-1 lg:h-full ${
+        <div className={`w-full lg:w-96 flex flex-col justify-between border-t lg:border-t-0 lg:border-l shadow-2xl h-full min-h-0 shrink-0 ${
           isLight ? 'bg-white border-slate-300' : 'bg-slate-900 border-slate-800'
         } ${mobileTab === 'menu' ? 'hidden lg:flex' : 'flex'}`}>
           <div className={'p-3 border-b flex items-center justify-between ' + (isLight ? 'bg-slate-50 border-slate-300' : 'bg-slate-950/60 border-slate-800')}>
@@ -1132,7 +1128,7 @@ export const PosModule: React.FC = () => {
             )}
           </div>
 
-          <div className={'p-3 border-t space-y-2 ' + (isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950/80 border-slate-800')}>
+          <div className={'p-3 border-t space-y-2 shrink-0 ' + (isLight ? 'bg-slate-100 border-slate-300' : 'bg-slate-950/80 border-slate-800')}>
             <div className="flex items-baseline justify-between px-1">
               <span className={'text-sm font-black ' + (isLight ? 'text-slate-700' : 'text-slate-300')}>TOTAL MESA</span>
               <span className={'text-2xl font-black ' + (isLight ? 'text-emerald-700' : 'text-emerald-400')}>S/ {activeTable.total.toFixed(2)}</span>
@@ -1237,7 +1233,7 @@ export const PosModule: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono text-orange-500 uppercase font-black">
-                      {activeProductForModal.flavorSlots?.length ? '🍨 Selección de Helado & Sabores' : 'Personalizar Receta'}
+                      {activeProductForModal.flavorSlots?.length ? '✨ Personalizar Receta / Opciones' : 'Personalizar Receta'}
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">({activeProductForModal.sku})</span>
                   </div>
@@ -1246,9 +1242,9 @@ export const PosModule: React.FC = () => {
                     <span className="text-emerald-600 dark:text-emerald-400 font-black text-sm">
                       Precio Base: S/ {activeProductForModal.price.toFixed(2)}
                     </span>
-                    {activeProductForModal.flavorSlots && (
+                    {activeProductForModal.flavorSlots && activeProductForModal.flavorSlots.length > 0 && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-500 font-bold">
-                        {activeProductForModal.flavorSlots.length} {activeProductForModal.flavorSlots.length === 1 ? 'Bola' : 'Bolas'} a elección
+                        {activeProductForModal.flavorSlots.length} {activeProductForModal.flavorSlots.length === 1 ? 'opción requerida' : 'opciones requeridas'}
                       </span>
                     )}
                   </div>
@@ -1290,7 +1286,7 @@ export const PosModule: React.FC = () => {
                       } else if (slot.category && slot.category !== 'todas') {
                         allowedIds = ingredients.filter(i => i.category === slot.category).map(i => i.id);
                       } else {
-                        allowedIds = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+                        allowedIds = ingredients.map(i => i.id);
                       }
 
                       return (
@@ -1402,8 +1398,8 @@ export const PosModule: React.FC = () => {
                     <div className="p-3 bg-amber-500/10 border border-amber-500/40 rounded-2xl mb-3 space-y-2 animate-in fade-in">
                       <div className="flex items-center justify-between text-xs">
                         <span className="font-bold text-amber-500 flex items-center gap-1">
-                          <span>🍨</span>
-                          <span>¿Qué sabor deseas para "{variantPickingMod.label}"?</span>
+                          <span>✨</span>
+                          <span>¿Qué variedad / opción deseas para "{variantPickingMod.label}"?</span>
                         </span>
                         <button
                           type="button"
@@ -1414,15 +1410,11 @@ export const PosModule: React.FC = () => {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {(variantPickingMod.allowedIngredientIds || [
-                          'ing-base-helado-vainilla',
-                          'ing-helado-chocolate',
-                          'ing-helado-fresa',
-                          'ing-helado-lucuma',
-                          'ing-helado-mango',
-                          'ing-helado-maracuya'
-                        ]).map(ingId => {
+                      <div className="grid grid-cols-3 gap-1.5 max-h-48 overflow-y-auto no-scrollbar">
+                        {(variantPickingMod.allowedIngredientIds && variantPickingMod.allowedIngredientIds.length > 0
+                          ? variantPickingMod.allowedIngredientIds
+                          : ingredients.filter(i => i.category === 'helados').map(i => i.id)
+                        ).map(ingId => {
                           const info = getFlavorInfo(ingId);
                           return (
                             <button

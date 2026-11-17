@@ -19,6 +19,7 @@ export function createApiRouter(io: Server) {
         name: row.name,
         itemType: row.item_type,
         category: row.category,
+        icon: row.icon || undefined,
         unit: row.unit,
         stock: row.stock,
         minStock: row.min_stock,
@@ -161,8 +162,8 @@ export function createApiRouter(io: Server) {
       const ingredients = req.body as any[];
       const stmt = db.prepare(`
         INSERT OR REPLACE INTO ingredients 
-        (id, code, name, item_type, category, unit, stock, min_stock, cost_per_unit, is_tax_affected, batches, is_intermediate_recipe, recipe_id, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        (id, code, name, item_type, category, icon, unit, stock, min_stock, cost_per_unit, is_tax_affected, batches, is_intermediate_recipe, recipe_id, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
       `);
 
       const tx = db.transaction(() => {
@@ -180,6 +181,7 @@ export function createApiRouter(io: Server) {
             ing.name,
             ing.itemType,
             ing.category || '',
+            ing.icon || null,
             ing.unit,
             ing.stock,
             ing.minStock,

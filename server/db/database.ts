@@ -43,6 +43,7 @@ export function initDatabase() {
       name TEXT NOT NULL,
       item_type TEXT NOT NULL,
       category TEXT,
+      icon TEXT,
       unit TEXT NOT NULL,
       stock REAL NOT NULL DEFAULT 0,
       min_stock REAL NOT NULL DEFAULT 0,
@@ -198,5 +199,16 @@ export function initDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migraciones seguras para columnas agregadas
+  try {
+    const ingTableInfo = db.prepare("PRAGMA table_info(ingredients)").all() as any[];
+    const hasIcon = ingTableInfo.some(col => col.name === 'icon');
+    if (!hasIcon) {
+      db.prepare("ALTER TABLE ingredients ADD COLUMN icon TEXT").run();
+    }
+  } catch (err) {
+    console.error('Error verificando columna icon en ingredients:', err);
+  }
 }
 

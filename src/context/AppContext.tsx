@@ -151,9 +151,9 @@ interface AppContextType {
   // Configuración de Menú & Recetas
   menuConfig: MenuConfig;
   updateMenuConfig: (newConfig: MenuConfig) => void;
-  addNewProductRecipe: (product: Product, lineId: 'linea-fria' | 'linea-caliente', categoryId: string) => void;
+  addNewProductRecipe: (product: Product, lineId: string, categoryId: string) => void;
   updateProductRecipe: (product: Product) => void;
-  addRecipeCategory: (name: string, lineId: 'linea-fria' | 'linea-caliente') => void;
+  addRecipeCategory: (name: string, lineId: string) => void;
 
   // Insumos e Inventario Maestro
   ingredients: Ingredient[];
@@ -533,7 +533,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveMenuConfig(newConfig).catch(() => {});
   };
 
-  const addNewProductRecipe = (product: Product, lineId: 'linea-fria' | 'linea-caliente', categoryId: string) => {
+  const addNewProductRecipe = (product: Product, lineId: string, categoryId: string) => {
     setMenuConfig(prev => {
       const updatedLines = prev.lines.map(line => {
         if (line.id === lineId) {
@@ -568,7 +568,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const addRecipeCategory = (name: string, lineId: 'linea-fria' | 'linea-caliente') => {
+  const addRecipeCategory = (name: string, lineId: string) => {
     const trimmed = name.trim();
     if (!trimmed) return;
     const catId = `cat-${trimmed.toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString().slice(-4)}`;

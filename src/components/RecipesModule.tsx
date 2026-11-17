@@ -92,7 +92,7 @@ export const RecipesModule: React.FC = () => {
   const [newProductName, setNewProductName] = useState<string>('');
   const [newProductShortName, setNewProductShortName] = useState<string>('');
   const [newProductSku, setNewProductSku] = useState<string>('');
-  const [newProductLine, setNewProductLine] = useState<'linea-fria' | 'linea-caliente'>('linea-fria');
+  const [newProductLine, setNewProductLine] = useState<string>(menuConfig.lines[0]?.id || 'linea-fria');
   const [newProductCategoryId, setNewProductCategoryId] = useState<string>(
     menuConfig.lines[0]?.categories[0]?.id || ''
   );
@@ -124,7 +124,7 @@ export const RecipesModule: React.FC = () => {
   const [tempQty, setTempQty] = useState<string>('0.150');
 
   // Función para autogenerar correlativo secuencial de SKU
-  const generateNextSku = (type: 'final' | 'intermedia' | 'base', line: 'linea-fria' | 'linea-caliente') => {
+  const generateNextSku = (type: 'final' | 'intermedia' | 'base', line: string) => {
     if (type === 'base' || type === 'intermedia') {
       const subList = allProducts.filter(p => p.sku.startsWith('SUB-'));
       const maxNum = subList.reduce((max, p) => {
@@ -133,7 +133,7 @@ export const RecipesModule: React.FC = () => {
       }, 0);
       return `SUB-${String(maxNum + 1).padStart(3, '0')}`;
     }
-    const prefix = line === 'linea-fria' ? 'JUG' : 'SAN';
+    const prefix = line === 'linea-fria' ? 'JUG' : line === 'linea-caliente' ? 'SAN' : 'REC';
     const list = allProducts.filter(p => p.sku.startsWith(prefix + '-'));
     const maxNum = list.reduce((max, p) => {
       const num = parseInt(p.sku.replace(prefix + '-', ''), 10);
@@ -206,14 +206,14 @@ export const RecipesModule: React.FC = () => {
 
   // Categorías completas del menú (con iconos y pertenencia a línea)
   const menuCategories = useMemo(() => {
-    const list: { id: string; name: string; lineId: 'linea-fria' | 'linea-caliente'; icon: string }[] = [];
+    const list: { id: string; name: string; lineId: string; icon: string }[] = [];
     menuConfig.lines.forEach(l => {
       l.categories.forEach(c => {
         list.push({
           id: c.id,
           name: c.name,
           lineId: l.id,
-          icon: l.id === 'linea-fria' ? '🥤' : '🥪'
+          icon: c.icon || (l.id === 'linea-fria' ? '🥤' : '🥪')
         });
       });
     });
@@ -1122,14 +1122,17 @@ export const RecipesModule: React.FC = () => {
                     <select
                       value={newProductLine}
                       onChange={e => {
-                        const l = e.target.value as any;
+                        const l = e.target.value;
                         setNewProductLine(l);
                         setNewProductSku(generateNextSku('final', l));
                       }}
                       className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
                     >
-                      <option value="linea-fria">Línea Fría (Jugos, Frappés, Helados)</option>
-                      <option value="linea-caliente">Línea Caliente (Sándwiches, Waffles)</option>
+                      {menuConfig.lines.map(line => (
+                        <option key={line.id} value={line.id}>
+                          {line.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1250,18 +1253,18 @@ export const RecipesModule: React.FC = () => {
                       type="button"
                       onClick={() => {
                         const nextIdx = newFlavorSlots.length;
-                        const defaultCat = newProductLine === 'linea-caliente' ? 'panaderia' : 'helados';
-                        const catConfig = availableIngredientCategories.find(c => c.id === defaultCat) || availableIngredientCategories[0] || { defaultQty: 1, defaultUnit: 'und' };
-                        const defaultAllowed = ingredients.filter(i => i.category === defaultCat).map(i => i.id);
+                        const defaultCat = availableIngredientCategories[0]?.id || 'helados';
+                        const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
+                        const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
 
                         setNewFlavorSlots(prev => [
                           ...prev,
                           {
                             slotIndex: nextIdx,
-                            label: defaultCat === 'panaderia' ? 'Tipo de Pan' : defaultCat === 'helados' ? `Bola ${nextIdx + 1}` : 'Opción a Elección',
+                            label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
                             category: defaultCat,
-                            quantity: catConfig.defaultQty,
-                            unit: catConfig.defaultUnit as any,
+                            quantity: catConfig.defaultQty || 1,
+                            unit: (catConfig.defaultUnit as any) || 'und',
                             required: true,
                             allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
                           }
@@ -1320,7 +1323,7 @@ export const RecipesModule: React.FC = () => {
                                         category: newCat,
                                         quantity: catConf?.defaultQty || s.quantity,
                                         unit: (catConf?.defaultUnit as any) || s.unit,
-                                        label: s.label === 'Bola 1' && newCat === 'panaderia' ? 'Tipo de Pan' : s.label,
+                                        label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
                                         allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
                                       };
                                     }));
@@ -1800,18 +1803,18 @@ export const RecipesModule: React.FC = () => {
                     type="button"
                     onClick={() => {
                       const nextIdx = editFlavorSlots.length;
-                      const defaultCat = selectedProduct.sku.startsWith('SAN-') ? 'panaderia' : 'helados';
-                      const catConfig = availableIngredientCategories.find(c => c.id === defaultCat) || availableIngredientCategories[0] || { defaultQty: 1, defaultUnit: 'und' };
-                      const defaultAllowed = ingredients.filter(i => i.category === defaultCat).map(i => i.id);
+                      const defaultCat = availableIngredientCategories[0]?.id || 'helados';
+                      const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
+                      const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
 
                       setEditFlavorSlots(prev => [
                         ...prev,
                         {
                           slotIndex: nextIdx,
-                          label: defaultCat === 'panaderia' ? 'Tipo de Pan' : defaultCat === 'helados' ? `Bola ${nextIdx + 1}` : 'Opción a Elección',
+                          label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
                           category: defaultCat,
-                          quantity: catConfig.defaultQty,
-                          unit: catConfig.defaultUnit as any,
+                          quantity: catConfig.defaultQty || 1,
+                          unit: (catConfig.defaultUnit as any) || 'und',
                           required: true,
                           allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
                         }
@@ -1870,7 +1873,7 @@ export const RecipesModule: React.FC = () => {
                                       category: newCat,
                                       quantity: catConf?.defaultQty || s.quantity,
                                       unit: (catConf?.defaultUnit as any) || s.unit,
-                                      label: s.label === 'Bola 1' && newCat === 'panaderia' ? 'Tipo de Pan' : s.label,
+                                      label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
                                       allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
                                     };
                                   }));

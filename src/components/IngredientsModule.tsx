@@ -58,6 +58,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
   const [editMinStock, setEditMinStock] = useState<string>('');
   const [editCost, setEditCost] = useState<string>('');
   const [editCategory, setEditCategory] = useState<string>('');
+  const [editIcon, setEditIcon] = useState<string>('');
 
   // Totales valorizados para reporte general
   const valuationMetrics = useMemo(() => {
@@ -129,6 +130,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [newName, setNewName] = useState<string>('');
   const [newCode, setNewCode] = useState<string>('');
+  const [newIcon, setNewIcon] = useState<string>('');
   const [newItemType, setNewItemType] = useState<ItemType>('insumo');
   const [newCategory, setNewCategory] = useState<string>('helados');
   const [newUnit, setNewUnit] = useState<MeasurementUnit>('kg');
@@ -143,6 +145,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
     setEditMinStock(ing.minStock.toString());
     setEditCost(ing.costPerUnit.toString());
     setEditCategory(ing.category || '');
+    setEditIcon(ing.icon || '');
   };
 
   const saveEdit = (ing: Ingredient) => {
@@ -152,6 +155,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
       minStock: parseFloat(editMinStock) || ing.minStock,
       costPerUnit: parseFloat(editCost) || ing.costPerUnit,
       category: ing.itemType === 'insumo' ? (editCategory || ing.category) : ing.category,
+      icon: editIcon.trim() || undefined,
       lastUpdated: new Date().toISOString()
     };
     updateIngredient(updated);
@@ -227,6 +231,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
       name: newName.trim(),
       itemType: newItemType,
       category: newItemType === 'insumo' ? newCategory : undefined,
+      icon: newIcon.trim() || undefined,
       unit: newUnit,
       stock: parseFloat(newStock) || 0,
       minStock: parseFloat(newMinStock) || 0,
@@ -238,6 +243,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
     setShowAddModal(false);
     setNewName('');
     setNewCode('');
+    setNewIcon('');
   };
 
   const filteredIngredients = ingredients.filter(ing => {
@@ -523,7 +529,23 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                     </td>
 
                     <td className="px-4 py-3">
-                      <div className="font-extrabold flex items-center gap-1.5">
+                      <div className="font-extrabold flex items-center gap-2">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={editIcon}
+                            onChange={e => setEditIcon(e.target.value)}
+                            placeholder={ingredientCategories.find(c => c.id === (editCategory || ing.category))?.icon || '🏷️'}
+                            className={`w-9 text-center border rounded px-1 py-0.5 text-xs font-bold ${
+                              isLight ? 'bg-white border-cyan-500 text-slate-900' : 'bg-slate-950 border-cyan-500 text-white'
+                            }`}
+                            title="Emoji / ícono opcional (déjalo vacío para heredar de la categoría)"
+                          />
+                        ) : (
+                          <span className="text-sm shrink-0">
+                            {ing.icon || ingredientCategories.find(c => c.id === ing.category)?.icon || (ing.itemType === 'descartable' ? '📦' : ing.itemType === 'consumible' ? '🧼' : '🏷️')}
+                          </span>
+                        )}
                         <span className={isLight ? 'text-slate-900' : 'text-white'}>{ing.name}</span>
                         {(ing.itemType === 'subreceta' || ing.isIntermediateRecipe || (ing.code && ing.code.startsWith('SUB-'))) && (
                           <span className={`text-[9px] px-1.5 py-0.2 rounded font-mono font-bold border ${
@@ -755,27 +777,44 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
               </div>
 
               {newItemType === 'insumo' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Categoría</label>
-                  <select
-                    value={newCategory}
-                    onChange={e => {
-                      const c = e.target.value;
-                      setNewCategory(c);
-                      if (c === 'lacteos' || c === 'abarrotes' || c === 'jarabes_bases' || c === 'panaderia' || c === 'helados') {
-                        setNewIsTaxAffected(true);
-                      } else {
-                        setNewIsTaxAffected(false);
-                      }
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
-                  >
-                    {ingredientCategories.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.icon || '🏷️'} {c.label} {c.isSlotCategory ? '(Slot POS)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Categoría</label>
+                    <select
+                      value={newCategory}
+                      onChange={e => {
+                        const c = e.target.value;
+                        setNewCategory(c);
+                        if (c === 'lacteos' || c === 'abarrotes' || c === 'jarabes_bases' || c === 'panaderia' || c === 'helados') {
+                          setNewIsTaxAffected(true);
+                        } else {
+                          setNewIsTaxAffected(false);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
+                    >
+                      {ingredientCategories.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.icon || '🏷️'} {c.label} {c.isSlotCategory ? '(Slot POS)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Emoji (Opcional)</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Ej. 🍦"
+                        value={newIcon}
+                        onChange={e => setNewIcon(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold text-center focus:outline-none"
+                      />
+                      <span className="text-lg shrink-0 px-2 py-1 bg-slate-800 rounded-lg">
+                        {newIcon.trim() || ingredientCategories.find(c => c.id === newCategory)?.icon || '📦'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
 

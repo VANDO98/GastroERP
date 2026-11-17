@@ -24,12 +24,12 @@ function AppContent() {
   const isLight = themeMode === 'light';
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans select-none antialiased transition-colors pb-14 sm:pb-0 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
+    <div className={`h-screen max-h-screen flex flex-col font-sans select-none antialiased transition-colors overflow-hidden ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
       {/* Barra superior de navegación y métricas */}
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       {/* Contenedor dinámico según el módulo seleccionado */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden min-h-0">
         {activeTab === 'pos' && <PosModule />}
         {activeTab === 'kds' && <KdsModule />}
         {activeTab === 'recipes' && <RecipesModule />}
