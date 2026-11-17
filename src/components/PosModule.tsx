@@ -1353,19 +1353,22 @@ export const PosModule: React.FC = () => {
               {activeProductForModal.servingOptions && activeProductForModal.servingOptions.length > 0 && (
                 <div className="mb-5 space-y-2">
                   <span className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
-                    <span>📦</span>
-                    <span>2. Presentación / Servido</span>
+                    <span>🍽️</span>
+                    <span>Presentación / Opciones de Servido</span>
                   </span>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     {activeProductForModal.servingOptions.map(srv => {
                       const isSelected = tempServingSelection === srv.id;
+                      const linkedIng = srv.ingredientId ? ingredients.find(i => i.id === srv.ingredientId) : undefined;
+                      const icon = linkedIng?.icon || (srv.name.toLowerCase().includes('llevar') ? '🛍️' : '🍽️');
+
                       return (
                         <button
                           key={srv.id}
                           type="button"
                           onClick={() => setTempServingSelection(srv.id)}
-                          className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                          className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                             isSelected
                               ? 'bg-orange-600 text-white border-orange-500 shadow-md ring-2 ring-orange-400'
                               : isLight
@@ -1373,8 +1376,13 @@ export const PosModule: React.FC = () => {
                               : 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
                           }`}
                         >
-                          <span>{srv.name.includes('Cono') ? '🍦' : '🍨'}</span>
+                          <span>{icon}</span>
                           <span>{srv.name}</span>
+                          {srv.priceDelta && srv.priceDelta > 0 ? (
+                            <span className="text-[10px] opacity-80 font-mono font-normal">
+                              (+S/ {srv.priceDelta.toFixed(2)})
+                            </span>
+                          ) : null}
                         </button>
                       );
                     })}

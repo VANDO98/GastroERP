@@ -22,3 +22,4 @@ menu.lines.forEach((l: any) => {
 console.log('--- INGREDIENTS WITH CATEGORY ---');
 const ings = db.prepare('SELECT id, code, name, item_type, category, unit, stock, cost_per_unit FROM ingredients').all();
 console.table(ings.slice(0, 15));
+

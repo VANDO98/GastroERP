@@ -22,6 +22,7 @@ export const ToppingsMasterModule: React.FC = () => {
     updateToppingMaster,
     deleteToppingMaster,
     ingredients,
+    ingredientCategories,
     themeMode
   } = useApp();
 
@@ -63,6 +64,7 @@ export const ToppingsMasterModule: React.FC = () => {
   const [defaultPriceDelta, setDefaultPriceDelta] = useState<string>('1.50');
   const [isActive, setIsActive] = useState<boolean>(true);
   const [hasVariants, setHasVariants] = useState<boolean>(false);
+  const [variantCategory, setVariantCategory] = useState<string>('helados');
   const [ingSearchInput, setIngSearchInput] = useState<string>('');
   const [showIngSuggestions, setShowIngSuggestions] = useState<boolean>(false);
 
@@ -98,6 +100,7 @@ export const ToppingsMasterModule: React.FC = () => {
     setDefaultPriceDelta('1.50');
     setIsActive(true);
     setHasVariants(false);
+    setVariantCategory(ingredientCategories[0]?.id || 'helados');
     setShowIngSuggestions(false);
     setShowModal(true);
   };
@@ -111,6 +114,7 @@ export const ToppingsMasterModule: React.FC = () => {
     setDefaultPriceDelta(top.defaultPriceDelta.toString());
     setIsActive(top.isActive !== false);
     setHasVariants(top.hasVariants || false);
+    setVariantCategory(top.variantCategory || ingredientCategories[0]?.id || 'helados');
     const linked = ingredients.find(i => i.id === top.ingredientId);
     setIngSearchInput(linked ? linked.name : '');
     setShowIngSuggestions(false);
@@ -124,29 +128,30 @@ export const ToppingsMasterModule: React.FC = () => {
       return;
     }
 
-    if (!ingredientId) {
-      alert('Error: Todo topping DEBE estar estrictamente vinculado a un insumo o subreceta de almacén para controlar stock.');
-      return;
-    }
-
-    const linkedExists = ingredients.some(i => i.id === ingredientId);
-    if (!linkedExists) {
-      alert('Error: El insumo seleccionado no existe en el inventario de almacén.');
-      return;
-    }
-
     const qty = parseFloat(portionQuantity) || 0.010;
     const priceDelta = parseFloat(defaultPriceDelta) || 0;
-    const originType = detectedOriginType;
 
-    const defaultIceCreamAllowed = [
-      'ing-base-helado-vainilla',
-      'ing-helado-chocolate',
-      'ing-helado-fresa',
-      'ing-helado-lucuma',
-      'ing-helado-mango',
-      'ing-helado-maracuya'
-    ];
+    let finalIngredientId = ingredientId;
+    let originType: 'insumo' | 'subreceta' = detectedOriginType;
+
+    if (hasVariants) {
+      // Para toppings dinámicos con sabores a elegir en POS, seleccionamos un insumo de referencia de la categoría
+      const refIng = ingredients.find(i => (i.category || '').toLowerCase() === variantCategory.toLowerCase()) || sortedIngredients[0];
+      if (refIng) {
+        finalIngredientId = refIng.id;
+        originType = refIng.itemType === 'subreceta' ? 'subreceta' : 'insumo';
+      }
+    } else {
+      if (!finalIngredientId) {
+        alert('Error: Todo topping fijo DEBE estar estrictamente vinculado a un insumo o subreceta de almacén para controlar stock.');
+        return;
+      }
+      const linkedExists = ingredients.some(i => i.id === finalIngredientId);
+      if (!linkedExists) {
+        alert('Error: El insumo seleccionado no existe en el inventario de almacén.');
+        return;
+      }
+    }
 
     if (editingId) {
       const existing = toppingsMaster.find(t => t.id === editingId);
@@ -155,26 +160,28 @@ export const ToppingsMasterModule: React.FC = () => {
           ...existing,
           name: name.trim(),
           linkedItemType: originType,
-          ingredientId,
+          ingredientId: finalIngredientId,
           portionQuantity: qty,
           portionUnit,
           defaultPriceDelta: priceDelta,
           isActive,
           hasVariants,
-          allowedIngredientIds: hasVariants ? (existing.allowedIngredientIds || defaultIceCreamAllowed) : undefined
+          variantCategory: hasVariants ? variantCategory : undefined,
+          allowedIngredientIds: undefined
         });
       }
     } else {
       addToppingMaster({
         name: name.trim(),
         linkedItemType: originType,
-        ingredientId,
+        ingredientId: finalIngredientId,
         portionQuantity: qty,
         portionUnit,
         defaultPriceDelta: priceDelta,
         isActive,
         hasVariants,
-        allowedIngredientIds: hasVariants ? defaultIceCreamAllowed : undefined
+        variantCategory: hasVariants ? variantCategory : undefined,
+        allowedIngredientIds: undefined
       });
     }
 
@@ -290,6 +297,9 @@ export const ToppingsMasterModule: React.FC = () => {
                 filteredToppings.map(top => {
                   const ing = ingredients.find(i => i.id === top.ingredientId);
                   const portionCost = ing ? (ing.costPerUnit * top.portionQuantity) : 0;
+                  const catObj = ingredientCategories.find(
+                    c => c.id === top.variantCategory || c.name.toLowerCase() === (top.variantCategory || '').toLowerCase()
+                  );
 
                   return (
                     <tr
@@ -304,35 +314,57 @@ export const ToppingsMasterModule: React.FC = () => {
                           <span>{top.name}</span>
                           {top.hasVariants && (
                             <span className="text-[9px] bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30 px-1.5 py-0.2 rounded font-bold">
-                              🍨 Con Sabores
+                              ✨ Con Variantes
                             </span>
                           )}
                         </div>
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                          top.linkedItemType === 'subreceta'
-                            ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
-                            : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-                        }`}>
-                          {top.linkedItemType === 'subreceta' ? '🥣 Subreceta / Pulpa' : '📦 Insumo Fresco'}
-                        </span>
+                        {top.hasVariants ? (
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30">
+                            ✨ Selección en POS
+                          </span>
+                        ) : (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            top.linkedItemType === 'subreceta'
+                              ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                              : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+                          }`}>
+                            {top.linkedItemType === 'subreceta' ? '🥣 Subreceta / Pulpa' : '📦 Insumo Fresco'}
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="font-bold text-slate-800 dark:text-slate-200">
-                          {ing?.name || top.ingredientId}
-                        </div>
-                        <span className="text-[10px] font-mono text-slate-400">
-                          Cód: {ing?.code || 'N/A'} • Stock: {ing?.stock.toFixed(2)} {ing?.unit}
-                        </span>
+                        {top.hasVariants ? (
+                          <div>
+                            <div className="font-bold text-cyan-400 flex items-center gap-1.5">
+                              <span>✨ Selección en POS</span>
+                              <span className="text-[9px] bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-1 rounded">
+                                Dinámico
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              Categoría: <strong className="text-white">{catObj ? `${catObj.icon || '📦'} ${catObj.name}` : top.variantCategory || 'Sabores/Variantes'}</strong>
+                            </span>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="font-bold text-slate-800 dark:text-slate-200">
+                              {ing?.name || top.ingredientId}
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              Cód: {ing?.code || 'N/A'} • Stock: {ing?.stock.toFixed(2)} {ing?.unit}
+                            </span>
+                          </>
+                        )}
                       </td>
 
                       <td className="py-3 px-3 text-center font-mono font-bold text-amber-600 dark:text-amber-400">
                         {top.portionQuantity} {top.portionUnit}
                         <span className="block text-[10px] text-slate-400 font-normal">
-                          Costo: S/ {portionCost.toFixed(2)}
+                          {top.hasVariants ? 'Porción por sabor' : `Costo: S/ ${portionCost.toFixed(2)}`}
                         </span>
                       </td>
 
@@ -405,84 +437,138 @@ export const ToppingsMasterModule: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Mango en Cubitos (10g)"
+                  placeholder="Ej: Mango en Cubitos (10g) o + Bola de Helado"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
                 />
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-bold text-amber-300">
-                    Insumo o Subreceta a Descontar (Búsqueda predictiva)
-                  </label>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                    detectedOriginType === 'subreceta'
-                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                      : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                  }`}>
-                    {detectedOriginType === 'subreceta' ? '🥣 Subreceta / Base' : '🌱 Insumo de Almacén'}
+              {/* Selector de Modo: Fijo vs Variantes */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div>
+                  <span className="text-xs font-bold text-slate-200 block">¿Requiere elegir sabor o variante en POS?</span>
+                  <span className="text-[10px] text-slate-400">
+                    {hasVariants ? 'El cajero elegirá un sabor/opción en tiempo real.' : 'Descuenta siempre un insumo fijo específico.'}
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setHasVariants(!hasVariants)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all ${
+                    hasVariants
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 ring-1 ring-cyan-500/30'
+                      : 'bg-slate-800 text-slate-400 border-slate-700'
+                  }`}
+                >
+                  {hasVariants ? '✓ Con Variantes' : '— Insumo Fijo'}
+                </button>
+              </div>
 
-                <div className="relative">
-                  <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 focus-within:border-amber-500">
-                    <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="Escribe para buscar insumo o pulpa..."
-                      value={ingSearchInput}
-                      onChange={e => {
-                        setIngSearchInput(e.target.value);
-                        setShowIngSuggestions(true);
-                      }}
-                      onFocus={() => setShowIngSuggestions(true)}
-                      className="w-full bg-transparent text-white text-xs font-semibold focus:outline-none"
-                    />
-                    {ingredientId && (
-                      <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
-                        Seleccionado
-                      </span>
-                    )}
+              {hasVariants ? (
+                /* MODO VARIANTES: Seleccionar la categoría dinámica de donde saldrán los sabores/opciones */
+                <div className="p-3 bg-cyan-950/20 border border-cyan-500/30 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                      <span>✨</span>
+                      <span>Categoría de Insumos para Elegir en POS</span>
+                    </label>
+                    <span className="text-[10px] text-cyan-400 font-mono font-bold">Selección Dinámica</span>
+                  </div>
+                  <select
+                    value={variantCategory}
+                    onChange={e => {
+                      const newCat = e.target.value;
+                      setVariantCategory(newCat);
+                      const sample = ingredients.find(i => (i.category || '').toLowerCase() === newCat.toLowerCase());
+                      if (sample) setPortionUnit(sample.unit);
+                    }}
+                    className="w-full bg-slate-950 border border-cyan-500/50 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-cyan-400"
+                  >
+                    {ingredientCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.icon || '📦'} {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 leading-tight">
+                    En el POS se mostrarán todos los insumos activos de esta categoría (ej. Sabores de Helado, Panes, Salsas). El insumo que elija el cliente será el que se descuente del inventario.
+                  </p>
+                </div>
+              ) : (
+                /* MODO INSUMO FIJO: Búsqueda predictiva */
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-amber-300">
+                      Insumo o Subreceta a Descontar (Búsqueda predictiva)
+                    </label>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                      detectedOriginType === 'subreceta'
+                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                        : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    }`}>
+                      {detectedOriginType === 'subreceta' ? '🥣 Subreceta / Base' : '🌱 Insumo de Almacén'}
+                    </span>
                   </div>
 
-                  {showIngSuggestions && filteredIngSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto divide-y divide-slate-800">
-                      {filteredIngSuggestions.map(ing => (
-                        <button
-                          key={ing.id}
-                          type="button"
-                          onClick={() => {
-                            setIngredientId(ing.id);
-                            setIngSearchInput(ing.name);
-                            setPortionUnit(ing.unit);
-                            setShowIngSuggestions(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800/80 transition-colors ${
-                            ingredientId === ing.id ? 'bg-amber-500/10 text-amber-300' : 'text-slate-200'
-                          }`}
-                        >
-                          <div>
-                            <span className="font-bold">{ing.name}</span>
-                            <span className="text-[10px] text-slate-400 ml-2">
-                              ({ing.itemType === 'subreceta' ? '🥣 Subreceta' : '🌱 Insumo'})
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            Stock: {ing.stock.toFixed(2)} {ing.unit} • S/ {ing.costPerUnit.toFixed(2)}/{ing.unit}
-                          </span>
-                        </button>
-                      ))}
+                  <div className="relative">
+                    <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl px-2.5 py-1.5 focus-within:border-amber-500">
+                      <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Escribe para buscar insumo o pulpa..."
+                        value={ingSearchInput}
+                        onChange={e => {
+                          setIngSearchInput(e.target.value);
+                          setShowIngSuggestions(true);
+                        }}
+                        onFocus={() => setShowIngSuggestions(true)}
+                        className="w-full bg-transparent text-white text-xs font-semibold focus:outline-none"
+                      />
+                      {ingredientId && (
+                        <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 shrink-0">
+                          Seleccionado
+                        </span>
+                      )}
                     </div>
+
+                    {showIngSuggestions && filteredIngSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-20 max-h-48 overflow-y-auto divide-y divide-slate-800">
+                        {filteredIngSuggestions.map(ing => (
+                          <button
+                            key={ing.id}
+                            type="button"
+                            onClick={() => {
+                              setIngredientId(ing.id);
+                              setIngSearchInput(ing.name);
+                              setPortionUnit(ing.unit);
+                              setShowIngSuggestions(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-slate-800/80 transition-colors ${
+                              ingredientId === ing.id ? 'bg-amber-500/10 text-amber-300' : 'text-slate-200'
+                            }`}
+                          >
+                            <div>
+                              <span className="font-bold">{ing.name}</span>
+                              <span className="text-[10px] text-slate-400 ml-2">
+                                ({ing.itemType === 'subreceta' ? '🥣 Subreceta' : '🌱 Insumo'})
+                              </span>
+                            </div>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              Stock: {ing.stock.toFixed(2)} {ing.unit} • S/ {ing.costPerUnit.toFixed(2)}/{ing.unit}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {selectedIng && (
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Seleccionado: <strong className="text-white">{selectedIng.name}</strong> • Stock actual: <strong className="text-amber-400">{selectedIng.stock.toFixed(2)} {selectedIng.unit}</strong>
+                    </p>
                   )}
                 </div>
-                {selectedIng && (
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Seleccionado: <strong className="text-white">{selectedIng.name}</strong> • Stock actual: <strong className="text-amber-400">{selectedIng.stock.toFixed(2)} {selectedIng.unit}</strong>
-                  </p>
-                )}
-              </div>
+              )}
 
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">Recargo en Carta (S/)</label>
@@ -522,24 +608,6 @@ export const ToppingsMasterModule: React.FC = () => {
                     <option value="und">Unidades (und)</option>
                   </select>
                 </div>
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
-                <div>
-                  <span className="text-xs font-bold text-slate-200 block">¿Requiere elegir sabor o variante en POS?</span>
-                  <span className="text-[10px] text-slate-400">Ejemplo: Bola de Helado donde el cliente elige Vainilla, Chocolate, Lúcuma, etc.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setHasVariants(!hasVariants)}
-                  className={`px-3 py-1.5 rounded-xl font-bold text-xs border transition-all ${
-                    hasVariants
-                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
-                  }`}
-                >
-                  {hasVariants ? '✓ Con Selección' : '— Insumo Fijo'}
-                </button>
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">

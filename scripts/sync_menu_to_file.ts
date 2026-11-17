@@ -9,3 +9,4 @@ if (menuRow) {
   fs.writeFileSync(path.resolve('src/data/menuConfig.ts'), content, 'utf-8');
   console.log('✓ src/data/menuConfig.ts sincronizado con SQLite.');
 }
+

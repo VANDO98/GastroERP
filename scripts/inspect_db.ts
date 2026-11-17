@@ -15,3 +15,4 @@ console.table(ingTypes);
 console.log('--- INGREDIENT CATEGORIES ---');
 const cats = db.prepare('SELECT * FROM ingredient_categories').all();
 console.table(cats);
+

@@ -173,7 +173,7 @@ export const ProductionWasteModule: React.FC = () => {
     setSelectedRecipes(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Explosión BOM de Insumos requeridos calculados en tiempo real
+  // Explosión BOM de Insumos requeridos calculados en tiempo real (Excluye estrictamente descartables)
   const explodedRequiredIngredients = useMemo(() => {
     const map = new Map<string, {
       ingredient: typeof ingredients[0];
@@ -185,6 +185,14 @@ export const ProductionWasteModule: React.FC = () => {
       rec.bom.forEach(bomItem => {
         const ing = ingredients.find(i => i.id === bomItem.ingredientId);
         if (!ing) return;
+
+        // Los descartables (empaques, vasos, tapas, bolsas) NO se consumen en cocina/producción
+        // Su salida se efectúa exclusivamente en el POS con las órdenes de venta
+        const isDisposable = bomItem.isDisposable ||
+          ing.itemType === 'descartable' ||
+          (ing.category || '').toLowerCase().includes('descartable') ||
+          ing.code?.startsWith('DES-');
+        if (isDisposable) return;
 
         const needed = bomItem.quantity * rec.estimatedQuantity;
 
@@ -235,6 +243,30 @@ export const ProductionWasteModule: React.FC = () => {
 
     return result;
   }, [selectedRecipes, ingredients, ingredientWasteInput, ingredientRealInput]);
+
+  // Descartables asociados a las recetas seleccionadas (Informativos para despacho POS)
+  const associatedDisposables = useMemo(() => {
+    const map = new Map<string, { ingredient: typeof ingredients[0]; quantity: number }>();
+    selectedRecipes.forEach(rec => {
+      rec.bom.forEach(bomItem => {
+        const ing = ingredients.find(i => i.id === bomItem.ingredientId);
+        if (!ing) return;
+        const isDisposable = bomItem.isDisposable ||
+          ing.itemType === 'descartable' ||
+          (ing.category || '').toLowerCase().includes('descartable') ||
+          ing.code?.startsWith('DES-');
+        if (isDisposable) {
+          const needed = bomItem.quantity * rec.estimatedQuantity;
+          if (map.has(ing.id)) {
+            map.get(ing.id)!.quantity += needed;
+          } else {
+            map.set(ing.id, { ingredient: ing, quantity: needed });
+          }
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [selectedRecipes, ingredients]);
 
   const totalExplodedCost = useMemo(() => {
     return explodedRequiredIngredients.reduce((acc, curr) => acc + curr.totalCost, 0);
@@ -960,6 +992,33 @@ export const ProductionWasteModule: React.FC = () => {
                       );
                     })}
                   </div>
+
+                  {/* Panel Informativo de Descartables Asociados para Venta/Despacho */}
+                  {associatedDisposables.length > 0 && (
+                    <div className="mt-3 p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-cyan-400 flex items-center gap-1.5">
+                          <span>🛍️</span>
+                          <span>Descartables Asociados para Despacho en POS ({associatedDisposables.length})</span>
+                        </span>
+                        <span className="text-[10px] text-cyan-300 font-mono font-bold bg-cyan-500/20 px-2 py-0.5 rounded border border-cyan-500/40">
+                          Salida por Venta en POS
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 mb-2 leading-relaxed">
+                        Los descartables no se consumen durante la elaboración culinaria en cocina/barra. Su salida de almacén se registrará automáticamente cuando los platos o bebidas sean cobrados o despachados para llevar en el POS.
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {associatedDisposables.map((d, dIdx) => (
+                          <span key={dIdx} className="px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300 font-medium flex items-center gap-1.5">
+                            <span>📦</span>
+                            <span>{d.ingredient.name}:</span>
+                            <strong className="text-cyan-300 font-mono">{d.quantity} {d.ingredient.unit}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* BOTÓN DE ACCIÓN: FINALIZAR Y REGISTRAR PRODUCCIÓN */}

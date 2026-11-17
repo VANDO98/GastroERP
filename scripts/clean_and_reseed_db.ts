@@ -480,3 +480,4 @@ db.transaction(() => {
 
   console.log('✓ BASE DE DATOS SQLITE LIMPIADA Y RESEMBRADA CON ÉXITO.');
 })();
+
