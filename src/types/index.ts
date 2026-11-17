@@ -78,10 +78,16 @@ export interface FlavorSlotConfig {
   required?: boolean;
 }
 
+export interface ServingDisposableItem {
+  ingredientId: string;
+  quantity: number; // Cantidad a descontar por cada porción del plato/bebida (ej. 1 und)
+}
+
 export interface ServingOptionConfig {
   id: string;
-  name: string; // ej. "En Cono Barquillo" | "En Vasito + Cucharita"
-  ingredientId?: string;
+  name: string; // ej. "Para Llevar (Vaso + Tapa + Sorbete)"
+  ingredientId?: string; // Compatibilidad retroactiva para 1 solo insumo
+  disposables?: ServingDisposableItem[]; // Múltiples descartables asociados a la presentación
   priceDelta?: number;
 }
 
@@ -167,6 +173,7 @@ export interface SelectedServing {
   id: string;
   name: string;
   ingredientId?: string;
+  disposables?: ServingDisposableItem[];
   priceDelta?: number;
 }
 

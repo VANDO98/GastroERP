@@ -407,6 +407,7 @@ export const PosModule: React.FC = () => {
           id: foundServing.id,
           name: foundServing.name,
           ingredientId: foundServing.ingredientId,
+          disposables: foundServing.disposables,
           priceDelta: foundServing.priceDelta
         };
       }

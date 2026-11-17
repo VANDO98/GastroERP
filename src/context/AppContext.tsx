@@ -889,9 +889,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
         }
 
-        // 1.2 Descuento de envase o presentación seleccionada (ej. Cono barquillo o Vasito + cucharita)
-        if (item.selectedServing && item.selectedServing.ingredientId) {
-          applyDeduction(item.selectedServing.ingredientId, 1 * item.quantity);
+        // 1.2 Descuento de envases o descartables de la presentación seleccionada (soporte multi-descartable)
+        if (item.selectedServing) {
+          if (item.selectedServing.disposables && item.selectedServing.disposables.length > 0) {
+            item.selectedServing.disposables.forEach(d => {
+              if (d.ingredientId && d.quantity > 0) {
+                applyDeduction(d.ingredientId, d.quantity * item.quantity);
+              }
+            });
+          } else if (item.selectedServing.ingredientId) {
+            applyDeduction(item.selectedServing.ingredientId, 1 * item.quantity);
+          }
         }
 
         // 1.3 Descuento estricto de Toppings vinculados a insumos o subrecetas (incluyendo variantes de sabor)

@@ -54,15 +54,22 @@ export const RecipesModule: React.FC = () => {
   const toppingOptions: SearchableOption[] = useMemo(() => {
     return toppingsMaster.map(tm => {
       const linkedIng = ingredients.find(i => i.id === tm.ingredientId);
+      const catObj = ingredientCategories.find(
+        c => c.id === tm.variantCategory || c.name.toLowerCase() === (tm.variantCategory || '').toLowerCase()
+      );
+      const subtitle = tm.hasVariants
+        ? `✨ Selección en POS (${catObj ? `${catObj.icon || '🏷️'} ${catObj.name}` : tm.variantCategory || 'Variantes'}) • ${tm.portionQuantity} ${tm.portionUnit}`
+        : `${tm.portionQuantity} ${tm.portionUnit} de ${linkedIng?.name || tm.ingredientId}`;
+
       return {
         id: tm.id,
         code: 'TOP',
         label: tm.name,
-        subtitle: `${tm.portionQuantity} ${tm.portionUnit} de ${linkedIng?.name || tm.ingredientId}`,
+        subtitle,
         badge: `+ S/ ${tm.defaultPriceDelta.toFixed(2)}`
       };
     });
-  }, [toppingsMaster, ingredients]);
+  }, [toppingsMaster, ingredients, ingredientCategories]);
 
   // Todas las recetas activas del catálogo (incluye recetas de carta y subrecetas pre-elaboradas)
   const allProducts = menuConfig.lines.flatMap(l =>
@@ -1042,7 +1049,12 @@ export const RecipesModule: React.FC = () => {
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {selectedProduct.servingOptions.map(srv => {
-                    const ing = srv.ingredientId ? ingredients.find(i => i.id === srv.ingredientId) : undefined;
+                    const disposablesList = (srv.disposables && srv.disposables.length > 0)
+                      ? srv.disposables
+                      : srv.ingredientId
+                      ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
+                      : [];
+
                     return (
                       <div
                         key={srv.id}
@@ -1050,14 +1062,32 @@ export const RecipesModule: React.FC = () => {
                           isLight ? 'bg-slate-50 border-slate-200 text-slate-800' : 'bg-slate-950 border-slate-800 text-white'
                         }`}
                       >
-                        <div>
+                        <div className="space-y-1">
                           <span className="font-bold block">{srv.name}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            {ing ? `📦 Descuenta: 1 und de ${ing.name}` : '🍽️ Vajilla reutilizable (sin consumo)'}
-                          </span>
+                          {disposablesList.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {disposablesList.map((d, di) => {
+                                const ing = ingredients.find(i => i.id === d.ingredientId);
+                                return (
+                                  <span
+                                    key={di}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${
+                                      isLight ? 'bg-slate-200/80 text-slate-700' : 'bg-slate-900 border border-slate-700 text-slate-300'
+                                    }`}
+                                  >
+                                    📦 {d.quantity} {ing?.unit || 'und'} de {ing?.name || d.ingredientId}
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              🍽️ Vajilla reutilizable (sin consumo de descartable)
+                            </span>
+                          )}
                         </div>
-                        <span className="font-mono text-emerald-500 font-bold text-xs">
-                          {srv.priceDelta && srv.priceDelta > 0 ? `+S/ ${srv.priceDelta.toFixed(2)}` : 'Sin costo'}
+                        <span className="font-mono text-emerald-500 font-bold text-xs shrink-0 ml-2">
+                          {srv.priceDelta && srv.priceDelta > 0 ? `+S/ ${srv.priceDelta.toFixed(2)}` : 'Sin recargo'}
                         </span>
                       </div>
                     );
@@ -1484,65 +1514,137 @@ export const RecipesModule: React.FC = () => {
                     Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
                   </p>
                 ) : (
-                  <div className="space-y-2">
-                    {newServingOptions.map((srv, srvIdx) => (
-                      <div key={srv.id || srvIdx} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-wrap items-center gap-2 text-xs">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ej. En Plato / Para Llevar / En Copa"
-                          value={srv.name}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
-                          }}
-                          className="flex-1 min-w-[160px] bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                        />
+                  <div className="space-y-2.5">
+                    {newServingOptions.map((srv, srvIdx) => {
+                      const currentDisposables = (srv.disposables && srv.disposables.length > 0)
+                        ? srv.disposables
+                        : srv.ingredientId
+                        ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
+                        : [];
 
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">Descuenta:</span>
-                          <select
-                            value={srv.ingredientId || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, ingredientId: val || undefined } : s));
-                            }}
-                            className="bg-slate-950 border border-slate-700 text-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                          >
-                            <option value="">Ninguno / Vajilla reutilizable</option>
-                            {disposableIngredients.map(ing => (
-                              <option key={ing.id} value={ing.id}>
-                                {ing.name} (Stock: {ing.stock.toFixed(0)})
-                              </option>
-                            ))}
-                          </select>
+                      return (
+                        <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+                          {/* Fila principal: Nombre, Recargo y Eliminar */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex-1 min-w-[200px]">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
+                                value={srv.name}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
+                              <input
+                                type="number"
+                                step="any"
+                                placeholder="+ S/ 0.00"
+                                value={srv.priceDelta || 0}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
+                                }}
+                                className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setNewServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
+                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
+                              title="Eliminar presentación"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {/* Sub-lista de descartables que descuenta */}
+                          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                                <span>📦</span>
+                                <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const defaultId = disposableIngredients[0]?.id || '';
+                                  const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
+                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                }}
+                                className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                              >
+                                <Plus className="w-3 h-3 stroke-[3]" />
+                                <span>+ Agregar Descartable</span>
+                              </button>
+                            </div>
+
+                            {currentDisposables.length === 0 ? (
+                              <p className="text-[10px] text-slate-500 italic">
+                                🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {currentDisposables.map((disp, dIdx) => (
+                                  <div key={dIdx} className="flex items-center gap-2 text-xs">
+                                    <select
+                                      value={disp.ingredientId}
+                                      onChange={e => {
+                                        const newId = e.target.value;
+                                        const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
+                                        setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                      }}
+                                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                    >
+                                      {disposableIngredients.map(ing => (
+                                        <option key={ing.id} value={ing.id}>
+                                          {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
+                                        </option>
+                                      ))}
+                                    </select>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <input
+                                        type="number"
+                                        step="1"
+                                        min="1"
+                                        value={disp.quantity}
+                                        onChange={e => {
+                                          const qty = parseFloat(e.target.value) || 1;
+                                          const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
+                                          setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                        }}
+                                        className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
+                                      />
+                                      <span className="text-[10px] text-slate-400 font-mono">und</span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const next = currentDisposables.filter((_, idx) => idx !== dIdx);
+                                        setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                      }}
+                                      className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
+                                      title="Quitar descartable"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">Extra:</span>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="+ S/ 0.00"
-                            value={srv.priceDelta || 0}
-                            onChange={e => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
-                            }}
-                            className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-lg px-2 py-1 text-xs text-right focus:outline-none"
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setNewServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
-                          className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold"
-                          title="Eliminar presentación"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -2141,65 +2243,137 @@ export const RecipesModule: React.FC = () => {
                     Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
                   </p>
                 ) : (
-                  <div className="space-y-2">
-                    {editServingOptions.map((srv, srvIdx) => (
-                      <div key={srv.id || srvIdx} className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex flex-wrap items-center gap-2 text-xs">
-                        <input
-                          type="text"
-                          required
-                          placeholder="Ej. En Plato / Para Llevar / En Copa"
-                          value={srv.name}
-                          onChange={e => {
-                            const val = e.target.value;
-                            setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
-                          }}
-                          className="flex-1 min-w-[160px] bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                        />
+                  <div className="space-y-2.5">
+                    {editServingOptions.map((srv, srvIdx) => {
+                      const currentDisposables = (srv.disposables && srv.disposables.length > 0)
+                        ? srv.disposables
+                        : srv.ingredientId
+                        ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
+                        : [];
 
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">Descuenta:</span>
-                          <select
-                            value={srv.ingredientId || ''}
-                            onChange={e => {
-                              const val = e.target.value;
-                              setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, ingredientId: val || undefined } : s));
-                            }}
-                            className="bg-slate-950 border border-slate-700 text-slate-300 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                          >
-                            <option value="">Ninguno / Vajilla reutilizable</option>
-                            {disposableIngredients.map(ing => (
-                              <option key={ing.id} value={ing.id}>
-                                {ing.name} (Stock: {ing.stock.toFixed(0)})
-                              </option>
-                            ))}
-                          </select>
+                      return (
+                        <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+                          {/* Fila principal: Nombre, Recargo y Eliminar */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex-1 min-w-[200px]">
+                              <input
+                                type="text"
+                                required
+                                placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
+                                value={srv.name}
+                                onChange={e => {
+                                  const val = e.target.value;
+                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
+                                }}
+                                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
+                              <input
+                                type="number"
+                                step="any"
+                                placeholder="+ S/ 0.00"
+                                value={srv.priceDelta || 0}
+                                onChange={e => {
+                                  const val = parseFloat(e.target.value) || 0;
+                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
+                                }}
+                                className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
+                              />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setEditServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
+                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
+                              title="Eliminar presentación"
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          {/* Sub-lista de descartables que descuenta */}
+                          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                                <span>📦</span>
+                                <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const defaultId = disposableIngredients[0]?.id || '';
+                                  const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
+                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                }}
+                                className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                              >
+                                <Plus className="w-3 h-3 stroke-[3]" />
+                                <span>+ Agregar Descartable</span>
+                              </button>
+                            </div>
+
+                            {currentDisposables.length === 0 ? (
+                              <p className="text-[10px] text-slate-500 italic">
+                                🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
+                              </p>
+                            ) : (
+                              <div className="space-y-1.5">
+                                {currentDisposables.map((disp, dIdx) => (
+                                  <div key={dIdx} className="flex items-center gap-2 text-xs">
+                                    <select
+                                      value={disp.ingredientId}
+                                      onChange={e => {
+                                        const newId = e.target.value;
+                                        const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
+                                        setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                      }}
+                                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                    >
+                                      {disposableIngredients.map(ing => (
+                                        <option key={ing.id} value={ing.id}>
+                                          {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
+                                        </option>
+                                      ))}
+                                    </select>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <input
+                                        type="number"
+                                        step="1"
+                                        min="1"
+                                        value={disp.quantity}
+                                        onChange={e => {
+                                          const qty = parseFloat(e.target.value) || 1;
+                                          const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
+                                          setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                        }}
+                                        className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
+                                      />
+                                      <span className="text-[10px] text-slate-400 font-mono">und</span>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const next = currentDisposables.filter((_, idx) => idx !== dIdx);
+                                        setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                      }}
+                                      className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
+                                      title="Quitar descartable"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
-
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[11px] text-slate-400">Extra:</span>
-                          <input
-                            type="number"
-                            step="any"
-                            placeholder="+ S/ 0.00"
-                            value={srv.priceDelta || 0}
-                            onChange={e => {
-                              const val = parseFloat(e.target.value) || 0;
-                              setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
-                            }}
-                            className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-lg px-2 py-1 text-xs text-right focus:outline-none"
-                          />
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => setEditServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
-                          className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold"
-                          title="Eliminar presentación"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
