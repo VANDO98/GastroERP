@@ -59,17 +59,8 @@ import {
 } from '../services/apiService';
 
 
-// Mesas iniciales del local
-const defaultTables: TableOrder[] = [
-  { tableId: 'mesa-1', tableName: 'Mesa 1', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'mesa-2', tableName: 'Mesa 2', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'mesa-3', tableName: 'Mesa 3', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'mesa-4', tableName: 'Mesa 4', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'mesa-5', tableName: 'Mesa 5', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'mesa-6', tableName: 'Mesa 6', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'barra', tableName: 'Barra', status: 'libre', items: [], enableDisposables: false, manualDisposables: [], total: 0 },
-  { tableId: 'llevar', tableName: 'Para Llevar 1', status: 'libre', items: [], enableDisposables: true, manualDisposables: [], total: 0 },
-];
+// Mesas iniciales del local (vacías hasta recibir la configuración de SQLite)
+const defaultTables: TableOrder[] = [];
 
 /**
  * Función de deducción FIFO y recálculo ponderado del costo promedio del insumo
@@ -265,6 +256,11 @@ interface AppContextType {
   averageFoodCostToday: number;
   disposablesCostToday: number; // Costo real de descartables descontados hoy
   disposablesRevenueToday: number; // Cobrado en descartables hoy
+
+  // Estado de Inicialización y Conexión con SQLite
+  isInitialLoading: boolean;
+  syncError: string | null;
+  retrySync: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -305,11 +301,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  // 1. Estados en memoria: Inicializados con datos de arranque seguros y sincronizados al 100% con SQLite en fetchBootstrap
+  // 1. Estados en memoria: 100% vacíos en código y sincronizados exclusivamente con SQLite vía fetchBootstrap
   const [menuConfig, setMenuConfig] = useState<MenuConfig>(initialMenuConfig);
   const [ingredients, setIngredients] = useState<Ingredient[]>(initialIngredients);
   const [tables, setTables] = useState<TableOrder[]>(defaultTables);
-  const [activeTableId, setActiveTableId] = useState<string>('mesa-1');
+  const [activeTableId, setActiveTableId] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [detailedInvoices, setDetailedInvoices] = useState<DetailedPurchaseInvoice[]>([]);
   const [purchases, setPurchases] = useState<PurchaseRecord[]>([]);
@@ -318,62 +314,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [combos, setCombos] = useState<Combo[]>(initialCombos);
   const [customIngredientCategories, setCustomIngredientCategories] = useState<string[]>([]);
-  const [ingredientCategories, setIngredientCategories] = useState<IngredientCategory[]>([
-    { id: 'helados', name: 'helados', label: 'Sabores de Helado', icon: '🍨', defaultUnit: 'L', defaultQty: 0.07, isSlotCategory: true },
-    { id: 'panaderia', name: 'panaderia', label: 'Panadería & Panes', icon: '🥖', defaultUnit: 'und', defaultQty: 1, isSlotCategory: true },
-    { id: 'jarabes_bases', name: 'jarabes_bases', label: 'Jarabes, Salsas & Coberturas', icon: '🍯', defaultUnit: 'L', defaultQty: 0.03, isSlotCategory: true },
-    { id: 'frutas', name: 'frutas', label: 'Frutas Frescas', icon: '🍓', defaultUnit: 'kg', defaultQty: 0.08, isSlotCategory: false },
-    { id: 'lacteos', name: 'lacteos', label: 'Lácteos & Derivados', icon: '🥛', defaultUnit: 'L', defaultQty: 0.15, isSlotCategory: false },
-    { id: 'proteinas', name: 'proteinas', label: 'Proteínas & Fiambres', icon: '🥩', defaultUnit: 'kg', defaultQty: 0.05, isSlotCategory: false },
-    { id: 'abarrotes', name: 'abarrotes', label: 'Abarrotes & Secos', icon: '🌾', defaultUnit: 'kg', defaultQty: 0.05, isSlotCategory: false },
-    { id: 'descartables', name: 'descartables', label: 'Empaques & Descartables', icon: '📦', defaultUnit: 'und', defaultQty: 1, isSlotCategory: false },
-    { id: 'consumibles', name: 'consumibles', label: 'Limpieza & Químicos', icon: '🧼', defaultUnit: 'und', defaultQty: 1, isSlotCategory: false },
-  ]);
+  const [ingredientCategories, setIngredientCategories] = useState<IngredientCategory[]>([]);
   const [companyConfig, setCompanyConfig] = useState<CompanyConfig>(initialCompanyConfig);
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [toppingsMaster, setToppingsMaster] = useState<ToppingMaster[]>(initialToppingsMaster);
   const [tablesConfig, setTablesConfig] = useState<TableConfig[]>(initialTablesConfig);
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
 
+  // Estado de inicialización y sincronización centralizada
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
+
   // Bandera para evitar retransmitir al servidor lo que acabamos de recibir por WebSocket
   const isIncomingSocketUpdate = React.useRef(false);
 
   // Sincronización Inicial y Recurrente con Servidor Central (Base de Datos SQLite permanente)
+  const syncWithServer = React.useCallback(() => {
+    fetchBootstrap()
+      .then(data => {
+        if (!data) return;
+        isIncomingSocketUpdate.current = true;
+        if (data.companyConfig) setCompanyConfig(data.companyConfig);
+        if (data.tablesConfig) setTablesConfig(data.tablesConfig);
+        if (data.menuConfig) setMenuConfig(data.menuConfig);
+        if (data.ingredients) setIngredients(data.ingredients);
+        if (data.activeTables && data.activeTables.length > 0) {
+          setTables(data.activeTables);
+          setActiveTableId(prev => (prev && data.activeTables.some((t: any) => t.tableId === prev)) ? prev : data.activeTables[0].tableId);
+        } else if (data.activeTables) {
+          setTables([]);
+        }
+        if (data.orders) setOrders(data.orders);
+        if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
+        if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
+        if (data.toppingsMaster) setToppingsMaster(data.toppingsMaster);
+        if (data.combos) setCombos(data.combos);
+        if (data.suppliers) setSuppliers(data.suppliers);
+        if (data.wastes) setWastes(data.wastes);
+        if (data.productionOrders) setProductionOrders(data.productionOrders);
+        if (data.customCategories) setCustomIngredientCategories(data.customCategories);
+        if (data.ingredientCategories) setIngredientCategories(data.ingredientCategories);
+
+        setIsInitialLoading(false);
+        setSyncError(null);
+        console.log(`[Sync] Sincronización exitosa con SQLite: ${data.ingredients?.length || 0} insumos, ${data.menuConfig?.lines?.length || 0} líneas.`);
+        setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+      })
+      .catch(err => {
+        console.warn('[Sync] Conexión pendiente con SQLite, reintentando en 2.5s...', err.message);
+        setSyncError(err.message || 'Error al conectar con la base de datos central');
+      });
+  }, []);
+
+  const retrySync = React.useCallback(() => {
+    setIsInitialLoading(true);
+    setSyncError(null);
+    syncWithServer();
+  }, [syncWithServer]);
+
   useEffect(() => {
     let isMounted = true;
     let retryTimer: any = null;
 
-    const syncWithServer = () => {
-      fetchBootstrap()
-        .then(data => {
-          if (!isMounted || !data) return;
-          isIncomingSocketUpdate.current = true;
-          if (data.companyConfig) setCompanyConfig(data.companyConfig);
-          if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
-          if (data.menuConfig) setMenuConfig(data.menuConfig);
-          if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
-          if (data.activeTables && data.activeTables.length > 0) setTables(data.activeTables);
-          if (data.orders) setOrders(data.orders);
-          if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
-          if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
-          if (data.toppingsMaster && data.toppingsMaster.length > 0) setToppingsMaster(data.toppingsMaster);
-          if (data.combos && data.combos.length > 0) setCombos(data.combos);
-          if (data.suppliers && data.suppliers.length > 0) setSuppliers(data.suppliers);
-          if (data.wastes) setWastes(data.wastes);
-          if (data.productionOrders) setProductionOrders(data.productionOrders);
-          if (data.customCategories) setCustomIngredientCategories(data.customCategories);
-          if (data.ingredientCategories && data.ingredientCategories.length > 0) {
-            setIngredientCategories(data.ingredientCategories);
-          }
-          console.log(`[Sync] Sincronización exitosa con SQLite: ${data.ingredients?.length || 0} insumos, ${data.toppingsMaster?.length || 0} toppings.`);
-          setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
-        })
-        .catch(err => {
-          console.warn('[Sync] Conexión pendiente con SQLite, reintentando en 2.5s...', err.message);
-          if (isMounted) {
-            retryTimer = setTimeout(syncWithServer, 2500);
-          }
-        });
+    const periodicSync = () => {
+      syncWithServer();
+      if (isMounted) {
+        retryTimer = setTimeout(periodicSync, 5000);
+      }
     };
 
     // 1. Cargar datos de inmediato
@@ -1799,7 +1806,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ordersCountToday,
         averageFoodCostToday,
         disposablesCostToday,
-        disposablesRevenueToday
+        disposablesRevenueToday,
+        isInitialLoading,
+        syncError,
+        retrySync
       }}
     >
       {children}

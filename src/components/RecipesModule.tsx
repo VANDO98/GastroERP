@@ -92,14 +92,14 @@ export const RecipesModule: React.FC = () => {
   // Nueva Categoría de Receta
   const [showAddCatModal, setShowAddCatModal] = useState<boolean>(false);
   const [newCatName, setNewCatName] = useState<string>('');
-  const [newCatLine, setNewCatLine] = useState<'linea-fria' | 'linea-caliente'>('linea-fria');
+  const [newCatLine, setNewCatLine] = useState<string>(menuConfig.lines[0]?.id || '');
 
   // Modal para Crear Nueva Receta
   const [showNewRecipeModal, setShowNewRecipeModal] = useState<boolean>(false);
   const [newProductName, setNewProductName] = useState<string>('');
   const [newProductShortName, setNewProductShortName] = useState<string>('');
   const [newProductSku, setNewProductSku] = useState<string>('');
-  const [newProductLine, setNewProductLine] = useState<string>(menuConfig.lines[0]?.id || 'linea-fria');
+  const [newProductLine, setNewProductLine] = useState<string>(menuConfig.lines[0]?.id || '');
   const [newProductCategoryId, setNewProductCategoryId] = useState<string>(
     menuConfig.lines[0]?.categories[0]?.id || ''
   );
@@ -140,7 +140,9 @@ export const RecipesModule: React.FC = () => {
       }, 0);
       return `SUB-${String(maxNum + 1).padStart(3, '0')}`;
     }
-    const prefix = line === 'linea-fria' ? 'JUG' : line === 'linea-caliente' ? 'SAN' : 'REC';
+    const lineObj = menuConfig.lines.find(l => l.id === line);
+    const lineCode = (lineObj?.name || line || 'REC').substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '') || 'REC';
+    const prefix = lineCode.length >= 2 ? lineCode : 'REC';
     const list = allProducts.filter(p => p.sku.startsWith(prefix + '-'));
     const maxNum = list.reduce((max, p) => {
       const num = parseInt(p.sku.replace(prefix + '-', ''), 10);
@@ -184,16 +186,16 @@ export const RecipesModule: React.FC = () => {
     }, 0);
   };
 
-  // Categorías de insumos disponibles para vincular a los slots dinámicos (FILTRADAS EXCLUSIVAMENTE POR isSlotCategory === true)
+  // Categorías de insumos disponibles para vincular a los slots dinámicos (FILTRADAS POR isSlotCategory === true o todas)
   const availableIngredientCategories = useMemo(() => {
     const slotCats = (ingredientCategories || []).filter(c => c.isSlotCategory);
     const activeCats = slotCats.length > 0
       ? slotCats
-      : (ingredientCategories || []).filter(c => ['helados', 'panaderia', 'jarabes_bases'].includes(c.id));
+      : (ingredientCategories || []);
 
     return activeCats.map(c => ({
       id: c.id,
-      label: `${c.icon || '🏷️'} ${c.label}`,
+      label: `${c.icon || '🏷️'} ${c.label || c.name}`,
       defaultUnit: c.defaultUnit || 'und',
       defaultQty: Number(c.defaultQty) || 1
     }));
@@ -504,13 +506,16 @@ export const RecipesModule: React.FC = () => {
               />
               <select
                 value={newCatLine}
-                onChange={e => setNewCatLine(e.target.value as any)}
+                onChange={e => setNewCatLine(e.target.value)}
                 className={`w-full px-2 py-1 rounded-xl text-xs font-bold border ${
                   isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-slate-900 border-slate-700 text-white'
                 }`}
               >
-                <option value="linea-fria">🥤 Línea Fría</option>
-                <option value="linea-caliente">🥪 Línea Caliente</option>
+                {menuConfig.lines.map(line => (
+                  <option key={line.id} value={line.id}>
+                    {line.name}
+                  </option>
+                ))}
               </select>
               <div className="flex gap-1.5">
                 <button

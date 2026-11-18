@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Minus, Trash2, CheckCircle2, CreditCard, Banknote, QrCode, User, Coffee, Send, Package, Sparkles, AlertTriangle,
   ArrowLeft, Eye, Clock, UtensilsCrossed, ChevronRight, ShoppingBag, X
@@ -21,8 +21,25 @@ export const PosModule: React.FC = () => {
   // Modal de inspección rápida de comanda desde la tarjeta de mesa
   const [inspectingTable, setInspectingTable] = useState<TableOrder | null>(null);
 
-  const activeTable = tables.find(t => t.tableId === activeTableId) || tables[0];
-  const [selectedLineId, setSelectedLineId] = useState<string>(menuConfig.lines[0]?.id || 'linea-fria');
+  const activeTable = tables.find(t => t.tableId === activeTableId) || tables[0] || {
+    tableId: 'default',
+    tableName: 'Mesa General',
+    status: 'libre',
+    items: [],
+    enableDisposables: false,
+    manualDisposables: [],
+    total: 0
+  };
+  const [selectedLineId, setSelectedLineId] = useState<string>(menuConfig.lines[0]?.id || '');
+
+  // Sincronizar automáticamente la línea seleccionada cuando se cargan las líneas desde SQLite
+  useEffect(() => {
+    if (menuConfig.lines.length > 0) {
+      if (!selectedLineId || (!menuConfig.lines.some(l => l.id === selectedLineId) && selectedLineId !== 'combos')) {
+        setSelectedLineId(menuConfig.lines[0].id);
+      }
+    }
+  }, [menuConfig.lines, selectedLineId]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
   const [activeProductForModal, setActiveProductForModal] = useState<Product | null>(null);
   const [tempModifiers, setTempModifiers] = useState<(QuickModifier & { selectedVariantIngredientId?: string; selectedVariantName?: string })[]>([]);
@@ -287,7 +304,7 @@ export const PosModule: React.FC = () => {
         } else if (slot.category && slot.category !== 'todas') {
           allowed = ingredients.filter(i => i.category === slot.category).map(i => i.id);
         } else {
-          allowed = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+          allowed = ingredients.map(i => i.id);
         }
 
         const firstAvail = allowed.find(id => {
@@ -329,11 +346,11 @@ export const PosModule: React.FC = () => {
 
       let allowedIngredientIds = mod.allowedIngredientIds || masterTop?.allowedIngredientIds;
       if (!allowedIngredientIds || allowedIngredientIds.length === 0) {
-        const targetCategory = mod.variantCategory || masterTop?.variantCategory || masterTop?.category || (mod.label.toLowerCase().includes('helado') ? 'helados' : mod.label.toLowerCase().includes('pan') ? 'panaderia' : undefined);
-        if (targetCategory) {
+        const targetCategory = mod.variantCategory || masterTop?.variantCategory || masterTop?.category;
+        if (targetCategory && targetCategory !== 'todas') {
           allowedIngredientIds = ingredients.filter(i => i.category === targetCategory).map(i => i.id);
         } else {
-          allowedIngredientIds = ingredients.filter(i => i.category === 'helados').map(i => i.id);
+          allowedIngredientIds = ingredients.map(i => i.id);
         }
       }
 
@@ -787,11 +804,7 @@ export const PosModule: React.FC = () => {
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
               {menuConfig.lines.map(line => {
                 const isSelected = selectedLineId === line.id;
-                const defaultActiveStyle = line.id === 'linea-fria'
-                  ? 'bg-cyan-600 text-white shadow-cyan-600/30 ring-2 ring-cyan-400'
-                  : line.id === 'linea-caliente'
-                  ? 'bg-rose-600 text-white shadow-rose-600/30 ring-2 ring-rose-400'
-                  : 'bg-orange-600 text-white shadow-orange-600/30 ring-2 ring-orange-400';
+                const defaultActiveStyle = line.theme?.activeTabClass || 'bg-orange-600 text-white shadow-orange-600/30 ring-2 ring-orange-400';
 
                 return (
                   <button
@@ -897,40 +910,34 @@ export const PosModule: React.FC = () => {
                   const hasSlots = product.flavorSlots && product.flavorSlots.length > 0;
                   const hasModifiers = (product.quickModifiers && product.quickModifiers.length > 0) || hasSlots;
                   const stockAlert = getProductStockAlert(product);
-                  const isDrink = selectedLineId === 'linea-fria';
-
-                  return (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => hasModifiers ? handleOpenModifiers(product) : addItemToActiveTable(product, [])}
-                      className={`h-24 sm:h-28 rounded-2xl p-2.5 border transition-all text-left flex flex-col justify-between shadow-sm active:scale-95 select-none relative ${
-                        stockAlert.isLow ? 'ring-2 ring-amber-400 border-amber-400 ' : ''
-                      } ${
-                        isLight
-                          ? isDrink
-                            ? 'bg-cyan-50/80 hover:bg-cyan-100/80 border-cyan-200 text-slate-900'
-                            : 'bg-orange-50/80 hover:bg-orange-100/80 border-orange-200 text-slate-900'
-                          : isDrink
-                          ? 'bg-slate-900/90 hover:bg-slate-800 border-cyan-500/30 text-white'
-                          : 'bg-slate-900/90 hover:bg-slate-800 border-orange-500/30 text-white'
-                      }`}
-                    >
-                      <div className="flex-1 overflow-hidden w-full">
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[9px] font-mono uppercase font-bold text-slate-400 truncate">
-                            {product.sku}
-                          </span>
-                          {hasSlots ? (
-                            <span className="text-[8px] font-bold px-1 rounded bg-cyan-500/20 text-cyan-500 flex items-center gap-0.5">
-                              🍨 SABORES
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => hasModifiers ? handleOpenModifiers(product) : addItemToActiveTable(product, [])}
+                        className={`h-24 sm:h-28 rounded-2xl p-2.5 border transition-all text-left flex flex-col justify-between shadow-sm active:scale-95 select-none relative ${
+                          stockAlert.isLow ? 'ring-2 ring-amber-400 border-amber-400 ' : ''
+                        } ${
+                          isLight
+                            ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-900 shadow-sm'
+                            : 'bg-slate-900/90 hover:bg-slate-800 border-slate-800 text-white'
+                        }`}
+                      >
+                        <div className="flex-1 overflow-hidden w-full">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-[9px] font-mono uppercase font-bold text-slate-400 truncate">
+                              {product.sku}
                             </span>
-                          ) : hasModifiers ? (
-                            <span className="text-[8px] font-bold px-1 rounded bg-orange-500/20 text-orange-400">
-                              OPC
-                            </span>
-                          ) : null}
-                        </div>
+                            {hasSlots ? (
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 flex items-center gap-0.5 font-mono">
+                                ⚙️ OPCIONES
+                              </span>
+                            ) : hasModifiers ? (
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400 font-mono">
+                                + EXTRAS
+                              </span>
+                            ) : null}
+                          </div>
                         <h3 className="text-xs sm:text-sm font-black leading-tight line-clamp-2 mt-1">
                           {product.shortName || product.name}
                         </h3>
