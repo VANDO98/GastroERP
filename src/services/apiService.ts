@@ -2,10 +2,10 @@ import { io } from 'socket.io-client';
 
 // Detecta automáticamente la IP del host desde el navegador del dispositivo (PC, Tablet o Móvil)
 const serverHost = window.location.hostname || 'localhost';
-export const API_URL = `http://${serverHost}:3001/api`;
-export const SOCKET_URL = `http://${serverHost}:3001`;
+export const API_URL = window.location.port === '5173' ? '/api' : `http://${serverHost}:3001/api`;
+export const SOCKET_URL = window.location.port === '5173' ? undefined : `http://${serverHost}:3001`;
 
-export const socket = io(SOCKET_URL, {
+export const socket = io(SOCKET_URL || undefined, {
   autoConnect: true,
   reconnection: true,
   reconnectionAttempts: Infinity,
@@ -13,9 +13,18 @@ export const socket = io(SOCKET_URL, {
 });
 
 export async function fetchBootstrap() {
-  const res = await fetch(`${API_URL}/bootstrap`);
-  if (!res.ok) throw new Error('Error al cargar datos del servidor');
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/bootstrap`);
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[apiService] Intento vía API_URL falló, probando puerto 3001 directo...', err);
+  }
+
+  // Fallback directo a puerto 3001
+  const directUrl = `http://${serverHost}:3001/api/bootstrap`;
+  const resDirect = await fetch(directUrl);
+  if (!resDirect.ok) throw new Error('Error al conectar con la base de datos central en el puerto 3001');
+  return resDirect.json();
 }
 
 export async function saveCompanyConfig(config: any) {

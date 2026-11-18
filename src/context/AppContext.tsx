@@ -338,35 +338,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Bandera para evitar retransmitir al servidor lo que acabamos de recibir por WebSocket
   const isIncomingSocketUpdate = React.useRef(false);
 
-  // Sincronización Inicial con Servidor Central (Base de Datos SQLite permanente)
+  // Sincronización Inicial y Recurrente con Servidor Central (Base de Datos SQLite permanente)
   useEffect(() => {
     let isMounted = true;
-    fetchBootstrap()
-      .then(data => {
-        if (!isMounted || !data) return;
-        isIncomingSocketUpdate.current = true;
-        if (data.companyConfig) setCompanyConfig(data.companyConfig);
-        if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
-        if (data.menuConfig) setMenuConfig(data.menuConfig);
-        if (data.ingredients) setIngredients(data.ingredients);
-        if (data.activeTables && data.activeTables.length > 0) setTables(data.activeTables);
-        if (data.orders) setOrders(data.orders);
-        if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
-        if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
-        if (data.toppingsMaster) setToppingsMaster(data.toppingsMaster);
-        if (data.combos) setCombos(data.combos);
-        if (data.suppliers) setSuppliers(data.suppliers);
-        if (data.wastes) setWastes(data.wastes);
-        if (data.productionOrders) setProductionOrders(data.productionOrders);
-        if (data.customCategories) setCustomIngredientCategories(data.customCategories);
-        if (data.ingredientCategories && data.ingredientCategories.length > 0) {
-          setIngredientCategories(data.ingredientCategories);
-        }
-        setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
-      })
-      .catch(err => {
-        console.warn('[Sync] Conexión inicial con SQLite:', err.message);
-      });
+    let retryTimer: any = null;
+
+    const syncWithServer = () => {
+      fetchBootstrap()
+        .then(data => {
+          if (!isMounted || !data) return;
+          isIncomingSocketUpdate.current = true;
+          if (data.companyConfig) setCompanyConfig(data.companyConfig);
+          if (data.tablesConfig && data.tablesConfig.length > 0) setTablesConfig(data.tablesConfig);
+          if (data.menuConfig) setMenuConfig(data.menuConfig);
+          if (data.ingredients && data.ingredients.length > 0) setIngredients(data.ingredients);
+          if (data.activeTables && data.activeTables.length > 0) setTables(data.activeTables);
+          if (data.orders) setOrders(data.orders);
+          if (data.detailedInvoices) setDetailedInvoices(data.detailedInvoices);
+          if (data.purchaseOrders) setPurchaseOrders(data.purchaseOrders);
+          if (data.toppingsMaster && data.toppingsMaster.length > 0) setToppingsMaster(data.toppingsMaster);
+          if (data.combos && data.combos.length > 0) setCombos(data.combos);
+          if (data.suppliers && data.suppliers.length > 0) setSuppliers(data.suppliers);
+          if (data.wastes) setWastes(data.wastes);
+          if (data.productionOrders) setProductionOrders(data.productionOrders);
+          if (data.customCategories) setCustomIngredientCategories(data.customCategories);
+          if (data.ingredientCategories && data.ingredientCategories.length > 0) {
+            setIngredientCategories(data.ingredientCategories);
+          }
+          console.log(`[Sync] Sincronización exitosa con SQLite: ${data.ingredients?.length || 0} insumos, ${data.toppingsMaster?.length || 0} toppings.`);
+          setTimeout(() => { isIncomingSocketUpdate.current = false; }, 200);
+        })
+        .catch(err => {
+          console.warn('[Sync] Conexión pendiente con SQLite, reintentando en 2.5s...', err.message);
+          if (isMounted) {
+            retryTimer = setTimeout(syncWithServer, 2500);
+          }
+        });
+    };
+
+    // 1. Cargar datos de inmediato
+    syncWithServer();
+
+    // 2. Al conectar o reconectar el WebSocket, forzar sincronización fresca
+    socket.on('connect', syncWithServer);
 
     // Escuchar eventos en vivo emitidos desde otros dispositivos en la red local
     const handleTablesUpdated = (updatedTables: TableOrder[]) => {
@@ -452,6 +466,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return () => {
       isMounted = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      socket.off('connect', syncWithServer);
       socket.off('tables:updated', handleTablesUpdated);
       socket.off('order:created', handleOrderCreated);
       socket.off('ingredients:updated', handleIngredientsUpdated);
