@@ -680,14 +680,14 @@ export const PurchaseOrdersModule: React.FC = () => {
       </div>
 
       {/* Tabla de Órdenes de Compra */}
-      <div className={`rounded-3xl border overflow-hidden shadow-sm ${
+      <div className={`rounded-3xl border shadow-sm flex flex-col ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
       }`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className={`border-b text-[10px] font-black uppercase tracking-wider ${
-                isLight ? 'bg-slate-100/80 border-slate-200 text-slate-600' : 'bg-slate-950/80 border-slate-800 text-slate-400'
+        <div className="overflow-auto max-h-[62vh] rounded-3xl">
+          <table className="w-full text-left border-collapse text-xs relative">
+            <thead className="sticky top-0 z-10 shadow-sm">
+              <tr className={`border-b text-[10px] font-black uppercase tracking-wider backdrop-blur-md ${
+                isLight ? 'bg-slate-100/95 border-slate-200 text-slate-700' : 'bg-slate-950/95 border-slate-800 text-slate-300'
               }`}>
                 <th className="py-3 px-4">N° de OC</th>
                 <th className="py-3 px-4">Proveedor</th>

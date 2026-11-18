@@ -202,7 +202,7 @@ export const ToppingsMasterModule: React.FC = () => {
   });
 
   return (
-    <div className={`flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col space-y-5 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
+    <div className={`flex-1 overflow-y-auto h-full min-h-0 p-4 sm:p-6 flex flex-col space-y-5 ${isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
       {/* Header */}
       <div className={`flex flex-wrap items-center justify-between gap-3 pb-4 border-b ${isLight ? 'border-slate-200' : 'border-slate-800'}`}>
         <div>
@@ -268,14 +268,14 @@ export const ToppingsMasterModule: React.FC = () => {
       </div>
 
       {/* Tabla del Catálogo Maestro */}
-      <div className={`rounded-3xl border overflow-hidden shadow-sm ${
+      <div className={`rounded-3xl border shadow-sm flex flex-col ${
         isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'
       }`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className={`border-b text-[10px] font-black uppercase tracking-wider ${
-                isLight ? 'bg-slate-100/80 border-slate-200 text-slate-600' : 'bg-slate-950/80 border-slate-800 text-slate-400'
+        <div className="overflow-auto max-h-[62vh] rounded-3xl">
+          <table className="w-full text-left border-collapse text-xs relative">
+            <thead className="sticky top-0 z-10 shadow-sm">
+              <tr className={`border-b text-[10px] font-black uppercase tracking-wider backdrop-blur-md ${
+                isLight ? 'bg-slate-100/95 border-slate-200 text-slate-700' : 'bg-slate-950/95 border-slate-800 text-slate-300'
               }`}>
                 <th className="py-3 px-4">Nombre del Topping</th>
                 <th className="py-3 px-4">Tipo</th>

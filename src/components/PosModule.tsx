@@ -1059,10 +1059,12 @@ export const PosModule: React.FC = () => {
                       )}
                       {item.selectedSlots && item.selectedSlots.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
-                          <span className="text-[10px] bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 px-2 py-0.5 rounded-lg border border-cyan-500/30 font-bold flex items-center gap-1">
-                            <span>🍨</span>
-                            <span>Bolas: {item.selectedSlots.map(s => s.ingredientName).join(' + ')}</span>
-                          </span>
+                          {item.selectedSlots.map((s, sIdx) => (
+                            <span key={sIdx} className="text-[10px] bg-cyan-500/10 text-cyan-700 dark:text-cyan-300 px-2 py-0.5 rounded-lg border border-cyan-500/30 font-bold flex items-center gap-1">
+                              <span>✨</span>
+                              <span>{s.slotLabel ? `${s.slotLabel}: ` : ''}{s.ingredientName}</span>
+                            </span>
+                          ))}
                         </div>
                       )}
                       {item.selectedServing && (

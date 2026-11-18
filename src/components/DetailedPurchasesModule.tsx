@@ -239,10 +239,10 @@ export const DetailedPurchasesModule: React.FC = () => {
             </button>
           </div>
 
-          <div className={'rounded-3xl border overflow-hidden shadow-2xl ' + (isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800')}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className={'text-[11px] uppercase tracking-wider font-bold border-b ' + (isLight ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-slate-950/80 text-slate-400 border-slate-800')}>
+          <div className={'rounded-3xl border shadow-2xl flex flex-col ' + (isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800')}>
+            <div className="overflow-auto max-h-[62vh] rounded-3xl">
+              <table className="w-full text-xs text-left relative">
+                <thead className={'text-[11px] uppercase tracking-wider font-bold border-b sticky top-0 z-10 shadow-sm backdrop-blur-md ' + (isLight ? 'bg-slate-100/95 text-slate-700 border-slate-200' : 'bg-slate-950/95 text-slate-300 border-slate-800')}>
                   <tr>
                     <th className="px-4 py-3">Cód.</th>
                     <th className="px-4 py-3">Registro</th>
@@ -475,10 +475,10 @@ export const DetailedPurchasesModule: React.FC = () => {
             </div>
           </div>
 
-          <div className={'rounded-3xl border overflow-hidden shadow-2xl ' + (isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800')}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className={'text-[11px] uppercase tracking-wider font-bold border-b ' + (isLight ? 'bg-slate-50 text-slate-500 border-slate-200' : 'bg-slate-950/80 text-slate-400 border-slate-800')}>
+          <div className={'rounded-3xl border shadow-2xl flex flex-col ' + (isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800')}>
+            <div className="overflow-auto max-h-[62vh] rounded-3xl">
+              <table className="w-full text-xs text-left relative">
+                <thead className={'text-[11px] uppercase tracking-wider font-bold border-b sticky top-0 z-10 shadow-sm backdrop-blur-md ' + (isLight ? 'bg-slate-100/95 text-slate-700 border-slate-200' : 'bg-slate-950/95 text-slate-300 border-slate-800')}>
                   <tr>
                     <th className="px-3 py-2.5">Código</th>
                     <th className="px-3 py-2.5">Descripción de Materia Prima</th>

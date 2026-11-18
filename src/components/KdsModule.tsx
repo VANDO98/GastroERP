@@ -326,12 +326,14 @@ export const KdsModule: React.FC = () => {
 
                             {item.selectedSlots && item.selectedSlots.length > 0 && (
                               <div className="flex flex-wrap gap-1 mt-1 pl-6">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
-                                  isLight ? 'bg-cyan-100 text-cyan-900 border-cyan-300' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                                }`}>
-                                  <span>🍨</span>
-                                  <span>Bolas: {item.selectedSlots.map(s => s.ingredientName).join(' + ')}</span>
-                                </span>
+                                {item.selectedSlots.map((s, sIdx) => (
+                                  <span key={sIdx} className={`text-[10px] font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
+                                    isLight ? 'bg-cyan-100 text-cyan-900 border-cyan-300' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                                  }`}>
+                                    <span>✨</span>
+                                    <span>{s.slotLabel ? `${s.slotLabel}: ` : ''}{s.ingredientName}</span>
+                                  </span>
+                                ))}
                               </div>
                             )}
 

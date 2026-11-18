@@ -496,10 +496,10 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
           </div>
 
       {/* Tabla Maestra de Insumos */}
-      <div className={`rounded-3xl border overflow-hidden shadow-xl ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs text-left">
-            <thead className={`text-[11px] uppercase tracking-wider font-extrabold border-b ${isLight ? 'bg-slate-100 text-slate-800 border-slate-200' : 'bg-slate-950/80 text-slate-400 border-slate-800'}`}>
+      <div className={`rounded-3xl border shadow-xl flex flex-col ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-slate-800'}`}>
+        <div className="overflow-auto max-h-[62vh] rounded-3xl">
+          <table className="w-full text-xs text-left relative">
+            <thead className={`text-[11px] uppercase tracking-wider font-extrabold border-b sticky top-0 z-10 shadow-sm backdrop-blur-md ${isLight ? 'bg-slate-100/95 text-slate-800 border-slate-200' : 'bg-slate-950/95 text-slate-300 border-slate-800'}`}>
               <tr>
                 <th className="px-4 py-3">Código</th>
                 <th className="px-4 py-3">Insumo / Empaque</th>

@@ -345,11 +345,11 @@ export const SalesHistoryModule: React.FC = () => {
       </div>
 
       {/* Tabla Cronológica de Ventas */}
-      <div className={`border rounded-3xl overflow-hidden shadow-sm ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className={`text-[11px] font-extrabold uppercase border-b ${
-              isLight ? 'bg-slate-100 text-slate-700 border-slate-200' : 'bg-slate-950/80 text-slate-300 border-slate-800'
+      <div className={`border rounded-3xl shadow-sm flex flex-col ${isLight ? 'bg-white border-slate-200' : 'bg-slate-900/60 border-slate-800'}`}>
+        <div className="overflow-auto max-h-[62vh] rounded-3xl">
+          <table className="w-full text-left text-xs relative">
+            <thead className={`text-[11px] font-extrabold uppercase border-b sticky top-0 z-10 shadow-sm backdrop-blur-md ${
+              isLight ? 'bg-slate-100/95 text-slate-700 border-slate-200' : 'bg-slate-950/95 text-slate-300 border-slate-800'
             }`}>
               <tr>
                 <th className="py-3 px-4">Ticket # / Hora</th>
