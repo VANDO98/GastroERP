@@ -12,7 +12,10 @@ import {
   Sparkles,
   Search,
   Edit3,
-  Filter
+  Filter,
+  ClipboardList,
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Product, BomItem, QuickModifier, FlavorSlotConfig, ServingOptionConfig } from '../types';
@@ -98,6 +101,7 @@ export const RecipesModule: React.FC = () => {
   const [showNewRecipeModal, setShowNewRecipeModal] = useState<boolean>(false);
   const [newProductName, setNewProductName] = useState<string>('');
   const [newProductShortName, setNewProductShortName] = useState<string>('');
+  const [newProductDescription, setNewProductDescription] = useState<string>('');
   const [newProductSku, setNewProductSku] = useState<string>('');
   const [newProductLine, setNewProductLine] = useState<string>(menuConfig.lines[0]?.id || '');
   const [newProductCategoryId, setNewProductCategoryId] = useState<string>(
@@ -109,6 +113,10 @@ export const RecipesModule: React.FC = () => {
   const [newBomItems, setNewBomItems] = useState<BomItem[]>([]);
   const [newFlavorSlots, setNewFlavorSlots] = useState<FlavorSlotConfig[]>([]);
   const [newServingOptions, setNewServingOptions] = useState<ServingOptionConfig[]>([]);
+  const [newQuickModifiers, setNewQuickModifiers] = useState<QuickModifier[]>([]);
+  const [newModBaseLabel, setNewModBaseLabel] = useState<string>('');
+  const [newSelectedToppingId, setNewSelectedToppingId] = useState<string>(toppingsMaster[0]?.id || '');
+  const [newRecipeActiveTab, setNewRecipeActiveTab] = useState<'bom' | 'options'>('bom');
 
   // Modal para Editar Receta Existente
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
@@ -125,6 +133,7 @@ export const RecipesModule: React.FC = () => {
   const [editTempIngId, setEditTempIngId] = useState<string>(ingredients[0]?.id || '');
   const [editTempQty, setEditTempQty] = useState<string>('0.100');
   const [selectedToppingId, setSelectedToppingId] = useState<string>(toppingsMaster[0]?.id || '');
+  const [editRecipeActiveTab, setEditRecipeActiveTab] = useState<'bom' | 'options'>('bom');
 
   // Selector para añadir insumo a la nueva receta
   const [tempIngId, setTempIngId] = useState<string>(ingredients[0]?.id || '');
@@ -308,6 +317,9 @@ export const RecipesModule: React.FC = () => {
     setEditFlavorSlots(prod.flavorSlots ? [...prod.flavorSlots] : []);
     setEditServingOptions(prod.servingOptions ? [...prod.servingOptions] : []);
     setEditQuickModifiers(prod.quickModifiers ? [...prod.quickModifiers] : []);
+    setSelectedToppingId(toppingsMaster[0]?.id || '');
+    setNewModLabel('');
+    setEditRecipeActiveTab('bom');
     setShowEditModal(true);
   };
 
@@ -398,11 +410,16 @@ export const RecipesModule: React.FC = () => {
     setNewProductSku(generateNextSku('final', 'linea-fria'));
     setNewProductName('');
     setNewProductShortName('');
+    setNewProductDescription('');
     setNewProductPrice('12.00');
     setNewProductType('final');
     setNewBomItems([]);
     setNewFlavorSlots([]);
     setNewServingOptions([]);
+    setNewQuickModifiers([]);
+    setNewModBaseLabel('');
+    setNewSelectedToppingId(toppingsMaster[0]?.id || '');
+    setNewRecipeActiveTab('bom');
     setShowNewRecipeModal(true);
   };
 
@@ -419,6 +436,7 @@ export const RecipesModule: React.FC = () => {
       sku: finalSku,
       name: newProductName.trim(),
       shortName: newProductShortName.trim() || newProductName.trim(),
+      description: newProductDescription.trim(),
       price: isSub ? 0 : (parseFloat(newProductPrice) || newRecipeSuggestedPrice30),
       targetCost: newRecipeEdibleCost,
       category: isSub ? 'cat-subrecetas-base' : newProductCategoryId,
@@ -437,10 +455,7 @@ export const RecipesModule: React.FC = () => {
           : newProductLine === 'linea-fria' ? 'border-cyan-500/40' : 'border-rose-600/50',
         textClass: isSub ? 'text-purple-300' : newProductLine === 'linea-fria' ? 'text-cyan-100' : 'text-rose-100'
       },
-      quickModifiers: isSub ? [] : [
-        { id: 'm-sin-azucar', label: 'Sin Azúcar', priceDelta: 0 },
-        { id: 'm-llevar', label: 'Para Llevar', priceDelta: 0.5 }
-      ],
+      quickModifiers: isSub ? [] : newQuickModifiers,
       recipeBom: newBomItems,
       flavorSlots: newFlavorSlots.length > 0 ? newFlavorSlots : undefined,
       servingOptions: newServingOptions.length > 0 ? newServingOptions : undefined
@@ -1118,572 +1133,959 @@ export const RecipesModule: React.FC = () => {
 
       {/* ================= MODAL DE NUEVA RECETA ================= */}
       {showNewRecipeModal && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-5xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            {/* Cabecera del Modal */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-black text-lg text-white flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-400" />
-                <span>{newProductType === 'base' || newProductType === 'intermedia' ? 'Crear Subreceta / Pre-elaborado' : 'Crear Nueva Receta / Plato'}</span>
-              </h3>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl">
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl text-white">
+                    {newProductType === 'base' || newProductType === 'intermedia'
+                      ? 'Crear Subreceta / Pre-elaborado'
+                      : 'Crear Nueva Receta / Plato en Carta'}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Define la ficha técnica, composición de insumos (BOM) y personalizaciones para el POS
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowNewRecipeModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+                className="w-9 h-9 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveRecipe} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Tipo de Creación</label>
-                  <select
-                    value={newProductType}
-                    onChange={e => {
-                      const val = e.target.value as any;
-                      setNewProductType(val);
-                      setNewProductSku(generateNextSku(val, newProductLine));
-                    }}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
+            {/* Selector de Pestañas / Pasos */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <button
+                type="button"
+                onClick={() => setNewRecipeActiveTab('bom')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  newRecipeActiveTab === 'bom'
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>1. Ficha del Plato & Insumos (BOM)</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                    newRecipeActiveTab === 'bom' ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  {newBomItems.length}
+                </span>
+              </button>
+
+              {newProductType === 'final' && (
+                <button
+                  type="button"
+                  onClick={() => setNewRecipeActiveTab('options')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+                    newRecipeActiveTab === 'options'
+                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>2. Opciones, Toppings & Servido (POS)</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                      newRecipeActiveTab === 'options' ? 'bg-slate-950 text-cyan-300' : 'bg-slate-900 text-slate-400'
+                    }`}
                   >
-                    <option value="final">🍽️ Receta Final (Plato en Carta)</option>
-                    <option value="base">🥣 Subreceta / Pre-elaborado (Stock)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Código SKU (Secuencial)</label>
-                  <input
-                    type="text"
-                    required
-                    value={newProductSku}
-                    onChange={e => setNewProductSku(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-white font-mono rounded-xl p-2.5 text-xs font-bold focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="min-w-0">
-                  <label className="block text-xs font-bold text-slate-300 mb-1">
-                    {newProductType === 'base' || newProductType === 'intermedia' ? 'Nombre de la Subreceta' : 'Nombre Completo (Carta / Clientes)'}
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder={newProductType === 'base' || newProductType === 'intermedia' ? 'Ej. Pulpa de Mango Congelada' : 'Ej. Sándwich Mixto Caliente'}
-                    value={newProductName}
-                    onChange={e => setNewProductName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none"
-                  />
-                </div>
-
-                {newProductType === 'final' && (
-                  <div className="min-w-0">
-                    <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center justify-between">
-                      <span>Nombre Corto (Comanda / KDS)</span>
-                      <span className="text-[10px] text-slate-400 font-normal">Para barra (&lt; 3 min)</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ej. Mixto Caliente"
-                      value={newProductShortName}
-                      onChange={e => setNewProductShortName(e.target.value)}
-                      className="w-full bg-slate-950 border border-amber-500/50 text-amber-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none placeholder-amber-400/30"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Si es subreceta, NO pedir línea operativa ni precio de carta */}
-              {newProductType === 'final' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="min-w-0">
-                    <label className="block text-xs font-bold text-slate-300 mb-1">Línea Operativa</label>
-                    <select
-                      value={newProductLine}
-                      onChange={e => {
-                        const l = e.target.value;
-                        setNewProductLine(l);
-                        setNewProductSku(generateNextSku('final', l));
-                      }}
-                      className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
-                    >
-                      {menuConfig.lines.map(line => (
-                        <option key={line.id} value={line.id}>
-                          {line.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="min-w-0">
-                    <label className="block text-xs font-bold text-slate-300 mb-1">Precio Carta (S/)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      required
-                      value={newProductPrice}
-                      onChange={e => setNewProductPrice(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-2xl">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-bold text-purple-300">Unidad de Rendimiento del Batch:</span>
-                      <p className="text-[11px] text-purple-200/70">
-                        Las subrecetas no tienen precio de carta ni línea de despacho; se almacenan en inventario por kg o L.
-                      </p>
-                    </div>
-                    <select
-                      value={newProductYieldUnit}
-                      onChange={e => setNewProductYieldUnit(e.target.value as any)}
-                      className="bg-purple-900 border border-purple-500 text-white rounded-xl px-3 py-1.5 text-xs font-bold"
-                    >
-                      <option value="kg">Kilos (kg)</option>
-                      <option value="L">Litros (L)</option>
-                      <option value="und">Unidades (und)</option>
-                    </select>
-                  </div>
-                </div>
+                    {newFlavorSlots.length + newQuickModifiers.length + newServingOptions.length}
+                  </span>
+                </button>
               )}
+            </div>
 
-              {/* Constructor de Insumos BOM con layout anti-desborde y autocompletado */}
-              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2.5">
-                <label className="block text-xs font-bold text-amber-300">
-                  Agregar Insumos o Subrecetas Componentes (BOM) — Búsqueda Inteligente
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                  <div className="flex-1 min-w-0">
-                    <SearchableSelect
-                      options={ingredientOptions}
-                      value={tempIngId}
-                      onChange={setTempIngId}
-                      placeholder="Escribe para buscar insumo o subreceta..."
-                      searchPlaceholder="Buscar por nombre, código o categoría..."
-                      isLight={isLight}
-                    />
-                  </div>
+            <form onSubmit={handleSaveRecipe} className="space-y-4">
+              {/* ================= PESTAÑA 1: FICHA & BOM ================= */}
+              {newRecipeActiveTab === 'bom' && (
+                <div className="space-y-4 animate-in fade-in">
+                  {/* Datos Maestros del Plato / Receta */}
+                  <div className="p-4 bg-slate-950/70 rounded-2xl border border-slate-800/90 space-y-3">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                      Datos Generales de Carta & Clasificación:
+                    </span>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="Cant."
-                      value={tempQty}
-                      onChange={e => setTempQty(e.target.value)}
-                      className="w-20 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
-                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-300 mb-1">Tipo de Creación</label>
+                        <select
+                          value={newProductType}
+                          onChange={e => {
+                            const val = e.target.value as any;
+                            setNewProductType(val);
+                            setNewProductSku(generateNextSku(val, newProductLine));
+                            if (val === 'base') setNewRecipeActiveTab('bom');
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
+                        >
+                          <option value="final">🍽️ Receta Final (Plato en Carta)</option>
+                          <option value="base">🥣 Subreceta / Pre-elaborado (Stock)</option>
+                        </select>
+                      </div>
 
-                    <button
-                      type="button"
-                      onClick={handleAddBomItem}
-                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all"
-                    >
-                      + Añadir
-                    </button>
-                  </div>
-                </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-bold text-slate-300 mb-1">
+                          {newProductType === 'base' || newProductType === 'intermedia'
+                            ? 'Nombre de la Subreceta *'
+                            : 'Nombre Completo (Carta / Clientes) *'}
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder={
+                            newProductType === 'base' || newProductType === 'intermedia'
+                              ? 'Ej. Pulpa de Mango Congelada'
+                              : 'Ej. Sándwich Mixto Caliente Especial'
+                          }
+                          value={newProductName}
+                          onChange={e => setNewProductName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
 
-                {/* Lista de Insumos Añadidos */}
-                <div className="space-y-1 mt-2 h-auto">
-                  {newBomItems.map((b, i) => {
-                    const ing = ingredients.find(ing => ing.id === b.ingredientId);
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between bg-slate-900 px-2.5 py-1.5 rounded-lg text-xs"
-                      >
-                        <span className="text-white font-medium">
-                          {ing?.name} ({b.quantity} {b.unit})
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400 font-mono">
-                            S/ {((ing?.costPerUnit || 0) * b.quantity).toFixed(2)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveBomItem(i)}
-                            className="text-rose-400 hover:text-rose-300"
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      {newProductType === 'final' ? (
+                        <>
+                          <div className="sm:col-span-2 min-w-0">
+                            <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center justify-between">
+                              <span>Nombre Corto (Comanda / KDS)</span>
+                              <span className="text-[10px] text-slate-400 font-normal">Para barra (&lt; 3 min)</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Mixto Caliente"
+                              value={newProductShortName}
+                              onChange={e => setNewProductShortName(e.target.value)}
+                              className="w-full bg-slate-900 border border-amber-500/50 text-amber-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none placeholder-amber-400/30"
+                            />
+                          </div>
+
+                          <div className="min-w-0">
+                            <label className="block text-xs font-bold text-slate-300 mb-1">Línea Operativa</label>
+                            <select
+                              value={newProductLine}
+                              onChange={e => {
+                                const l = e.target.value;
+                                setNewProductLine(l);
+                                setNewProductSku(generateNextSku('final', l));
+                                const lineObj = menuConfig.lines.find(x => x.id === l);
+                                if (lineObj && lineObj.categories.length > 0) {
+                                  setNewProductCategoryId(lineObj.categories[0].id);
+                                }
+                              }}
+                              className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
+                            >
+                              {menuConfig.lines.map(line => (
+                                <option key={line.id} value={line.id}>
+                                  {line.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="min-w-0">
+                            <label className="block text-xs font-bold text-slate-300 mb-1">Precio Carta (S/)</label>
+                            <input
+                              type="number"
+                              step="any"
+                              required
+                              value={newProductPrice}
+                              onChange={e => setNewProductPrice(e.target.value)}
+                              className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="sm:col-span-2">
+                            <label className="block text-xs font-bold text-purple-300 mb-1">
+                              Unidad de Rendimiento del Batch:
+                            </label>
+                            <select
+                              value={newProductYieldUnit}
+                              onChange={e => setNewProductYieldUnit(e.target.value as any)}
+                              className="w-full bg-purple-950/60 border border-purple-500/50 text-white rounded-xl p-2.5 text-xs font-bold"
+                            >
+                              <option value="kg">Kilos (kg)</option>
+                              <option value="L">Litros (L)</option>
+                              <option value="und">Unidades (und)</option>
+                            </select>
+                          </div>
+
+                          <div className="sm:col-span-2 flex flex-col justify-end">
+                            <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                              <span className="text-slate-400 font-medium">SKU Operativo:</span>
+                              <span className="font-mono font-bold text-amber-400">{newProductSku}</span>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* Fila de SKU y Categoría si es final */}
+                    {newProductType === 'final' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">Categoría en Menú</label>
+                          <select
+                            value={newProductCategoryId}
+                            onChange={e => setNewProductCategoryId(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-semibold focus:outline-none"
                           >
-                            ✕
-                          </button>
+                            {menuConfig.lines
+                              .find(l => l.id === newProductLine)
+                              ?.categories.map(c => (
+                                <option key={c.id} value={c.id}>
+                                  {c.icon || '🏷️'} {c.name}
+                                </option>
+                              )) || (
+                              <option value="">Sin categorías disponibles</option>
+                            )}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-bold text-slate-300 mb-1">Código SKU (Secuencial)</label>
+                          <input
+                            type="text"
+                            required
+                            value={newProductSku}
+                            onChange={e => setNewProductSku(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-700 text-white font-mono rounded-xl p-2.5 text-xs font-bold focus:outline-none"
+                          />
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                    )}
 
-              {/* SECCIÓN OPCIONAL: Ranuras de Insumo Variable / A Elección del Cliente (Panes, Helados, Leches, Jarabes, etc.) */}
-              {newProductType === 'final' && (
-                <div className="p-3.5 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
-                  <div className="flex items-center justify-between">
+                    {/* Notas de Preparación / Descripción de Carta */}
                     <div>
-                      <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
-                        <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
-                      </h4>
-                      <p className="text-[10px] text-slate-400">
-                        Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
-                      </p>
+                      <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center justify-between">
+                        <span>Notas de Preparación / Descripción de Carta (Opcional)</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Instrucciones para barra o detalle en carta</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ej. Licuar a velocidad media. Servir con sorbete de papel y rodaja de limón..."
+                        value={newProductDescription}
+                        onChange={e => setNewProductDescription(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:border-amber-500 resize-none"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextIdx = newFlavorSlots.length;
-                        const defaultCat = availableIngredientCategories[0]?.id || 'helados';
-                        const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
-                        const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
-
-                        setNewFlavorSlots(prev => [
-                          ...prev,
-                          {
-                            slotIndex: nextIdx,
-                            label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
-                            category: defaultCat,
-                            quantity: catConfig.defaultQty || 1,
-                            unit: (catConfig.defaultUnit as any) || 'und',
-                            required: true,
-                            allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
-                          }
-                        ]);
-                      }}
-                      className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>+ Añadir Opción Variable</span>
-                    </button>
                   </div>
 
-                  {newFlavorSlots.length > 0 && (
-                    <div className="space-y-3 pt-1">
-                      {newFlavorSlots.map((slot, sIdx) => {
-                        const slotCost = calculateSlotCost(slot);
-                        const currentCat = slot.category || 'todas';
-                        const categoryIngredients = currentCat === 'todas'
-                          ? ingredients
-                          : ingredients.filter(i => i.category === currentCat);
+                  {/* Constructor de Insumos BOM — Búsqueda Inteligente (PRIMERO) */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-black text-amber-300 uppercase tracking-wider block">
+                          Composición de Insumos & Subrecetas (BOM) — Búsqueda Inteligente
+                        </label>
+                        <p className="text-[11px] text-slate-400">
+                          Agrega los insumos o subrecetas que componen esta receta base.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 font-mono">
+                        {newBomItems.length} componentes
+                      </span>
+                    </div>
 
-                        return (
-                          <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                              {/* Nombre de la Ranura */}
-                              <div className="flex items-center gap-2 flex-1">
-                                <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
-                                <input
-                                  type="text"
-                                  value={slot.label}
-                                  onChange={e => {
-                                    const val = e.target.value;
-                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
-                                  }}
-                                  className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
-                                  placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
-                                />
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                      <div className="flex-1 min-w-0">
+                        <SearchableSelect
+                          options={ingredientOptions}
+                          value={tempIngId}
+                          onChange={setTempIngId}
+                          placeholder="Escribe para buscar insumo o subreceta..."
+                          searchPlaceholder="Buscar por nombre, código o categoría..."
+                          isLight={isLight}
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="Cant."
+                          value={tempQty}
+                          onChange={e => setTempQty(e.target.value)}
+                          className="w-24 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleAddBomItem}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center gap-1"
+                        >
+                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Añadir</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Lista / Tabla de Insumos Añadidos */}
+                    {newBomItems.length === 0 ? (
+                      <div className="p-4 bg-slate-900/60 rounded-xl text-center text-xs text-slate-500 italic border border-slate-800">
+                        No hay insumos añadidos a la composición BOM aún.
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 mt-2 max-h-60 overflow-y-auto pr-1">
+                        {newBomItems.map((b, i) => {
+                          const ing = ingredients.find(ing => ing.id === b.ingredientId);
+                          const cost = (ing?.costPerUnit || 0) * b.quantity;
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs"
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-base">{ing?.icon || '📦'}</span>
+                                <div>
+                                  <span className="text-white font-bold block">{ing?.name || b.ingredientId}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Costo: S/ {(ing?.costPerUnit || 0).toFixed(2)} / {ing?.unit}
+                                  </span>
+                                </div>
                               </div>
-
-                              {/* Selector de Categoría Vinculada */}
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
-                                <select
-                                  value={currentCat}
-                                  onChange={e => {
-                                    const newCat = e.target.value;
-                                    const catConf = availableIngredientCategories.find(c => c.id === newCat);
-                                    const allowed = newCat === 'todas'
-                                      ? undefined
-                                      : ingredients.filter(i => i.category === newCat).map(i => i.id);
-
-                                    setNewFlavorSlots(prev => prev.map((s, i) => {
-                                      if (i !== sIdx) return s;
-                                      return {
-                                        ...s,
-                                        category: newCat,
-                                        quantity: catConf?.defaultQty || s.quantity,
-                                        unit: (catConf?.defaultUnit as any) || s.unit,
-                                        label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
-                                        allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
-                                      };
-                                    }));
-                                  }}
-                                  className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
-                                >
-                                  {availableIngredientCategories.map(cat => (
-                                    <option key={cat.id} value={cat.id}>
-                                      {cat.label}
-                                    </option>
-                                  ))}
-                                </select>
-
+                              <div className="flex items-center gap-3">
+                                <span className="text-amber-400 font-mono font-bold">
+                                  {b.quantity} {b.unit}
+                                </span>
+                                <span className="text-slate-300 font-mono font-bold">
+                                  S/ {cost.toFixed(2)}
+                                </span>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setNewFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
-                                  }}
-                                  className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
-                                  title="Eliminar ranura"
+                                  onClick={() => handleRemoveBomItem(i)}
+                                  className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
+                                  title="Quitar de la receta"
                                 >
                                   ✕
                                 </button>
                               </div>
                             </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
-                            {/* Porción, Unidad y Resumen de Opciones */}
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
-                              <div className="flex items-center gap-2">
-                                <span className="text-slate-400">Porción descontada:</span>
-                                <input
-                                  type="number"
-                                  step="any"
-                                  value={slot.quantity}
-                                  onChange={e => {
-                                    const val = parseFloat(e.target.value) || 0;
-                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
-                                  }}
-                                  className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
-                                />
-                                <select
-                                  value={slot.unit}
-                                  onChange={e => {
-                                    const u = e.target.value as any;
-                                    setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
-                                  }}
-                                  className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
-                                >
-                                  <option value="und">und</option>
-                                  <option value="L">L</option>
-                                  <option value="kg">kg</option>
-                                  <option value="ml">ml</option>
-                                  <option value="g">g</option>
-                                </select>
-                                <span className="text-emerald-400 font-mono font-bold">
-                                  ~S/ {slotCost.toFixed(2)} / porción
-                                </span>
-                              </div>
-
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                                <span className="text-cyan-400 font-bold">
-                                  {categoryIngredients.length} insumos elegibles:
-                                </span>
-                                <span className="truncate max-w-[200px] text-slate-300">
-                                  {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
-                                  {categoryIngredients.length > 3 ? '...' : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  {/* Calculadora en vivo de Costos y Precios */}
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-400 block">Costo Comestible (Salón):</span>
+                      <div className="font-black text-white text-lg">S/ {newRecipeEdibleCost.toFixed(2)}</div>
+                      <span className="text-[10px] text-slate-500">Total con empaques: S/ {newRecipeCost.toFixed(2)}</span>
                     </div>
-                  )}
+
+                    {newProductType === 'final' && (
+                      <div className="text-right">
+                        <span className="text-amber-300 font-bold block">Precio Sugerido (30% FC):</span>
+                        <div className="font-black text-amber-400 text-xl">S/ {newRecipeSuggestedPrice30.toFixed(2)}</div>
+                        <span className="text-[10px] text-slate-400 font-mono">Piso Quiebre (45% FC): S/ {newRecipeFloorPrice45.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* SECCIÓN OPCIONAL: Presentaciones / Formas de Servido */}
-              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <span>🍽️</span>
-                      <span>Presentación & Formas de Servido (Opcional)</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      Define opciones de presentación (ej. "En Plato", "Para Llevar en Caja Kraft", "Vaso Vidrio"). Si no aplica, déjalo vacío.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newId = `srv-${Date.now()}`;
-                      setNewServingOptions(prev => [
-                        ...prev,
-                        {
-                          id: newId,
-                          name: '',
-                          priceDelta: 0
-                        }
-                      ]);
-                    }}
-                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>+ Añadir Opción</span>
-                  </button>
-                </div>
+              {/* ================= PESTAÑA 2: OPCIONES & TOPPINGS POS ================= */}
+              {newRecipeActiveTab === 'options' && newProductType === 'final' && (
+                <div className="space-y-4 animate-in fade-in">
+                  {/* SECCIÓN 1: Ranuras de Insumo Variable / A Elección */}
+                  <div className="p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextIdx = newFlavorSlots.length;
+                          const defaultCat = availableIngredientCategories[0]?.id || 'helados';
+                          const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
+                          const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
 
-                {newServingOptions.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic py-1">
-                    Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
-                  </p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {newServingOptions.map((srv, srvIdx) => {
-                      const currentDisposables = (srv.disposables && srv.disposables.length > 0)
-                        ? srv.disposables
-                        : srv.ingredientId
-                        ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
-                        : [];
+                          setNewFlavorSlots(prev => [
+                            ...prev,
+                            {
+                              slotIndex: nextIdx,
+                              label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
+                              category: defaultCat,
+                              quantity: catConfig.defaultQty || 1,
+                              unit: (catConfig.defaultUnit as any) || 'und',
+                              required: true,
+                              allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
+                            }
+                          ]);
+                        }}
+                        className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Añadir Opción Variable</span>
+                      </button>
+                    </div>
 
-                      return (
-                        <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
-                          {/* Fila principal: Nombre, Recargo y Eliminar */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex-1 min-w-[200px]">
-                              <input
-                                type="text"
-                                required
-                                placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
-                                value={srv.name}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
-                                }}
-                                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                              />
-                            </div>
+                    {newFlavorSlots.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-1">
+                        Sin ranuras variables. El producto no preguntará por sabores ni tipos de pan al agregarse al pedido.
+                      </p>
+                    ) : (
+                      <div className="space-y-3 pt-1">
+                        {newFlavorSlots.map((slot, sIdx) => {
+                          const slotCost = calculateSlotCost(slot);
+                          const currentCat = slot.category || 'todas';
+                          const categoryIngredients = currentCat === 'todas'
+                            ? ingredients
+                            : ingredients.filter(i => i.category === currentCat);
 
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
-                              <input
-                                type="number"
-                                step="any"
-                                placeholder="+ S/ 0.00"
-                                value={srv.priceDelta || 0}
-                                onChange={e => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
-                                }}
-                                className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
-                              />
-                            </div>
+                          return (
+                            <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
+                                  <input
+                                    type="text"
+                                    value={slot.label}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
+                                    placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
+                                  />
+                                </div>
 
-                            <button
-                              type="button"
-                              onClick={() => setNewServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
-                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
-                              title="Eliminar presentación"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
+                                  <select
+                                    value={currentCat}
+                                    onChange={e => {
+                                      const newCat = e.target.value;
+                                      const catConf = availableIngredientCategories.find(c => c.id === newCat);
+                                      const allowed = newCat === 'todas'
+                                        ? undefined
+                                        : ingredients.filter(i => i.category === newCat).map(i => i.id);
 
-                          {/* Sub-lista de descartables que descuenta */}
-                          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
-                                <span>📦</span>
-                                <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const defaultId = disposableIngredients[0]?.id || '';
-                                  const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
-                                  setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                }}
-                                className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
-                              >
-                                <Plus className="w-3 h-3 stroke-[3]" />
-                                <span>+ Agregar Descartable</span>
-                              </button>
-                            </div>
+                                      setNewFlavorSlots(prev => prev.map((s, i) => {
+                                        if (i !== sIdx) return s;
+                                        return {
+                                          ...s,
+                                          category: newCat,
+                                          quantity: catConf?.defaultQty || s.quantity,
+                                          unit: (catConf?.defaultUnit as any) || s.unit,
+                                          label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
+                                          allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
+                                        };
+                                      }));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
+                                  >
+                                    {availableIngredientCategories.map(cat => (
+                                      <option key={cat.id} value={cat.id}>
+                                        {cat.label}
+                                      </option>
+                                    ))}
+                                  </select>
 
-                            {currentDisposables.length === 0 ? (
-                              <p className="text-[10px] text-slate-500 italic">
-                                🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
-                              </p>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {currentDisposables.map((disp, dIdx) => (
-                                  <div key={dIdx} className="flex items-center gap-2 text-xs">
-                                    <select
-                                      value={disp.ingredientId}
-                                      onChange={e => {
-                                        const newId = e.target.value;
-                                        const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
-                                        setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                      }}
-                                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                    >
-                                      {disposableIngredients.map(ing => (
-                                        <option key={ing.id} value={ing.id}>
-                                          {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
-                                        </option>
-                                      ))}
-                                    </select>
-
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <input
-                                        type="number"
-                                        step="1"
-                                        min="1"
-                                        value={disp.quantity}
-                                        onChange={e => {
-                                          const qty = parseFloat(e.target.value) || 1;
-                                          const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
-                                          setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                        }}
-                                        className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
-                                      />
-                                      <span className="text-[10px] text-slate-400 font-mono">und</span>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const next = currentDisposables.filter((_, idx) => idx !== dIdx);
-                                        setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                      }}
-                                      className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
-                                      title="Quitar descartable"
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                ))}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setNewFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
+                                    }}
+                                    className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
+                                    title="Eliminar ranura"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400">Porción descontada:</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={slot.quantity}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
+                                    }}
+                                    className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
+                                  />
+                                  <select
+                                    value={slot.unit}
+                                    onChange={e => {
+                                      const u = e.target.value as any;
+                                      setNewFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                                  >
+                                    <option value="und">und</option>
+                                    <option value="L">L</option>
+                                    <option value="kg">kg</option>
+                                    <option value="ml">ml</option>
+                                    <option value="g">g</option>
+                                  </select>
+                                  <span className="text-emerald-400 font-mono font-bold">
+                                    ~S/ {slotCost.toFixed(2)} / porción
+                                  </span>
+                                </div>
+
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <span className="text-cyan-400 font-bold">
+                                    {categoryIngredients.length} insumos elegibles:
+                                  </span>
+                                  <span className="truncate max-w-[200px] text-slate-300">
+                                    {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
+                                    {categoryIngredients.length > 3 ? '...' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Calculadora en vivo del Precio Sugerido */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-slate-400">Costo Comestible (Salón):</span>
-                  <div className="font-black text-white text-sm">S/ {newRecipeEdibleCost.toFixed(2)}</div>
-                  <span className="text-[10px] text-slate-500">Total con empaques: S/ {newRecipeCost.toFixed(2)}</span>
+                  {/* SECCIÓN 2: Personalizaciones Base & Toppings Maestros */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <span>✨</span> Personalizaciones Base & Toppings Maestros
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Personalizaciones de preparación (ej. Sin Azúcar) y Toppings con descuento estricto de inventario.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 1. Modificadores Base */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        1. Modificadores Base de Preparación:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: 'mod-sin-azucar', label: 'Sin Azúcar', priceDelta: 0, cancelsSugar: true },
+                          { id: 'mod-poco-dulce', label: 'Poco Dulce', priceDelta: 0 },
+                          { id: 'mod-al-tiempo', label: 'Al Tiempo', priceDelta: 0 },
+                          { id: 'mod-con-hielo', label: 'Bien Helado', priceDelta: 0 },
+                        ].map(preset => {
+                          const alreadyAdded = newQuickModifiers.some(m => m.id === preset.id || m.label.toLowerCase() === preset.label.toLowerCase());
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              disabled={alreadyAdded}
+                              onClick={() => {
+                                if (!alreadyAdded) {
+                                  setNewQuickModifiers(prev => [
+                                    ...prev,
+                                    {
+                                      id: preset.id,
+                                      label: preset.label,
+                                      priceDelta: preset.priceDelta
+                                    }
+                                  ]);
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
+                                alreadyAdded
+                                  ? 'bg-slate-800/50 border-slate-800 text-slate-500 cursor-not-allowed'
+                                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-500 hover:text-amber-300 active:scale-95'
+                              }`}
+                            >
+                              <span>+</span>
+                              <span>{preset.label}</span>
+                              {preset.cancelsSugar && <span className="text-[9px] text-cyan-400 font-mono">[Anula azúcar]</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Otra instrucción base (ej. Sin sorbete, Poco hielo, Tibio)..."
+                          value={newModBaseLabel}
+                          onChange={e => setNewModBaseLabel(e.target.value)}
+                          className="flex-1 bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={!newModBaseLabel.trim()}
+                          onClick={() => {
+                            if (newModBaseLabel.trim()) {
+                              setNewQuickModifiers(prev => [
+                                ...prev,
+                                {
+                                  id: `mod-custom-${Date.now()}`,
+                                  label: newModBaseLabel.trim(),
+                                  priceDelta: 0
+                                }
+                              ]);
+                              setNewModBaseLabel('');
+                            }
+                          }}
+                          className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-bold rounded-xl text-xs whitespace-nowrap active:scale-95"
+                        >
+                          + Añadir Base
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Toppings Maestros */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                          2. Toppings Maestros (Descuentan Inventario por Porción):
+                        </span>
+                        <span className="text-[10px] text-slate-500">Solo desde Catálogo Maestro</span>
+                      </div>
+
+                      {toppingsMaster.length === 0 ? (
+                        <div className="p-2 bg-slate-900 rounded-xl text-center text-xs text-slate-400">
+                          No hay toppings registrados en el Catálogo Maestro de Toppings.
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                          <div className="flex-1 min-w-0">
+                            <SearchableSelect
+                              options={toppingOptions}
+                              value={newSelectedToppingId}
+                              onChange={setNewSelectedToppingId}
+                              placeholder="Buscar topping por nombre o porción..."
+                              searchPlaceholder="Escribe: leche deslactosada, chantilly, fudge..."
+                              isLight={isLight}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tm = toppingsMaster.find(t => t.id === newSelectedToppingId) || toppingsMaster[0];
+                              if (tm) {
+                                const alreadyAdded = newQuickModifiers.some(
+                                  m => m.toppingMasterId === tm.id || m.label.toLowerCase() === `+ ${tm.name.toLowerCase()}`
+                                );
+                                if (!alreadyAdded) {
+                                  setNewQuickModifiers(prev => [
+                                    ...prev,
+                                    {
+                                      id: `mod-top-${tm.id}`,
+                                      label: `+ ${tm.name}`,
+                                      priceDelta: tm.defaultPriceDelta,
+                                      toppingMasterId: tm.id,
+                                      ingredientId: tm.ingredientId,
+                                      quantity: tm.portionQuantity,
+                                      unit: tm.portionUnit,
+                                      hasVariants: tm.hasVariants,
+                                      variantCategory: tm.variantCategory,
+                                      allowedIngredientIds: tm.allowedIngredientIds
+                                    }
+                                  ]);
+                                }
+                              }
+                            }}
+                            className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center justify-center gap-1"
+                          >
+                            <span>+ Añadir Topping</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. Lista de Modificadores Asignados */}
+                    <div className="space-y-1.5 h-auto pr-1 pt-1 border-t border-slate-800/80">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Modificadores Asignados ({newQuickModifiers.length}):
+                      </span>
+                      {newQuickModifiers.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic py-1">
+                          No hay modificadores ni toppings asignados a esta receta.
+                        </p>
+                      ) : (
+                        newQuickModifiers.map((mod, idx) => {
+                          const isSinAzucar = mod.id === 'mod-sin-azucar' || mod.label.toLowerCase().includes('sin azucar') || mod.label.toLowerCase().includes('sin azúcar');
+                          const linkedIng = mod.ingredientId ? ingredients.find(i => i.id === mod.ingredientId) : undefined;
+                          const hasPortion = Boolean(mod.quantity && mod.quantity > 0);
+                          const catObj = mod.variantCategory ? ingredientCategories.find(c => c.id === mod.variantCategory) : undefined;
+
+                          return (
+                            <div
+                              key={mod.id || idx}
+                              className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs"
+                            >
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white">{mod.label}</span>
+                                {isSinAzucar && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30">
+                                    🚫 Anula consumo de azúcar en almacén
+                                  </span>
+                                )}
+                                {mod.hasVariants ? (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 font-mono">
+                                    ✨ Selección en POS: {mod.quantity} {mod.unit} ({catObj ? `${catObj.icon || '🏷️'} ${catObj.name}` : mod.variantCategory || 'Sabor a elección'})
+                                  </span>
+                                ) : hasPortion ? (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
+                                    📦 Descuenta: {mod.quantity} {mod.unit || linkedIng?.unit} de {linkedIng?.name || 'almacén'}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="font-mono text-emerald-400 font-bold">
+                                  {mod.priceDelta > 0 ? `+ S/ ${mod.priceDelta.toFixed(2)}` : 'S/ 0.00'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setNewQuickModifiers(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-rose-400 hover:text-rose-300 font-bold px-1"
+                                  title="Quitar modificador"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN 3: Presentaciones / Formas de Servido */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <span>🍽️</span>
+                          <span>Presentación & Formas de Servido (Opcional)</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Define opciones de presentación (ej. "En Plato", "Para Llevar en Caja Kraft", "Vaso Vidrio"). Si no aplica, déjalo vacío.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newId = `srv-${Date.now()}`;
+                          setNewServingOptions(prev => [
+                            ...prev,
+                            {
+                              id: newId,
+                              name: '',
+                              priceDelta: 0
+                            }
+                          ]);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>+ Añadir Opción</span>
+                      </button>
+                    </div>
+
+                    {newServingOptions.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-1">
+                        Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {newServingOptions.map((srv, srvIdx) => {
+                          const currentDisposables = (srv.disposables && srv.disposables.length > 0)
+                            ? srv.disposables
+                            : srv.ingredientId
+                            ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
+                            : [];
+
+                          return (
+                            <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
+                                    value={srv.name}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                                  />
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="+ S/ 0.00"
+                                    value={srv.priceDelta || 0}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
+                                    }}
+                                    className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setNewServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
+                                  className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
+                                  title="Eliminar presentación"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                                    <span>📦</span>
+                                    <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const defaultId = disposableIngredients[0]?.id || '';
+                                      const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
+                                      setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                    }}
+                                    className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                                  >
+                                    <Plus className="w-3 h-3 stroke-[3]" />
+                                    <span>+ Agregar Descartable</span>
+                                  </button>
+                                </div>
+
+                                {currentDisposables.length === 0 ? (
+                                  <p className="text-[10px] text-slate-500 italic">
+                                    🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
+                                  </p>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    {currentDisposables.map((disp, dIdx) => (
+                                      <div key={dIdx} className="flex items-center gap-2 text-xs">
+                                        <select
+                                          value={disp.ingredientId}
+                                          onChange={e => {
+                                            const newId = e.target.value;
+                                            const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
+                                            setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                          }}
+                                          className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                        >
+                                          {disposableIngredients.map(ing => (
+                                            <option key={ing.id} value={ing.id}>
+                                              {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
+                                            </option>
+                                          ))}
+                                        </select>
+
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <input
+                                            type="number"
+                                            step="1"
+                                            min="1"
+                                            value={disp.quantity}
+                                            onChange={e => {
+                                              const qty = parseFloat(e.target.value) || 1;
+                                              const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
+                                              setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                            }}
+                                            className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
+                                          />
+                                          <span className="text-[10px] text-slate-400 font-mono">und</span>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = currentDisposables.filter((_, idx) => idx !== dIdx);
+                                            setNewServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                          }}
+                                          className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
+                                          title="Quitar descartable"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
+              )}
 
-                <div className="text-right">
-                  <span className="text-amber-300 font-bold">Precio Sugerido (30% FC):</span>
-                  <div className="font-black text-amber-400 text-lg">S/ {newRecipeSuggestedPrice30.toFixed(2)}</div>
-                  <span className="text-[10px] text-slate-400 font-mono">Piso 45%: S/ {newRecipeFloorPrice45.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
+              {/* Botones de Acción al pie del Modal */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowNewRecipeModal(false)}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                  className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={!newProductName.trim() || (newBomItems.length === 0 && newFlavorSlots.length === 0)}
-                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20"
-                >
-                  GUARDAR & PUBLICAR RECETA
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {newProductType === 'final' && newRecipeActiveTab === 'bom' && (
+                    <button
+                      type="button"
+                      onClick={() => setNewRecipeActiveTab('options')}
+                      className="px-4 py-3 bg-cyan-600/30 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                    >
+                      <span>Siguiente: Configurar Opciones POS</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {newProductType === 'final' && newRecipeActiveTab === 'options' && (
+                    <button
+                      type="button"
+                      onClick={() => setNewRecipeActiveTab('bom')}
+                      className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Volver a Insumos BOM</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!newProductName.trim() || (newBomItems.length === 0 && newFlavorSlots.length === 0)}
+                    className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <span>Guardar & Publicar Receta</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -1692,749 +2094,870 @@ export const RecipesModule: React.FC = () => {
 
       {/* ================= MODAL DE EDICIÓN DE RECETA EXISTENTE ================= */}
       {showEditModal && selectedProduct && (
-        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-3xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-7 max-w-5xl w-full shadow-2xl space-y-4 animate-in fade-in zoom-in-95 max-h-[92vh] overflow-y-auto">
+            {/* Cabecera del Modal */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="font-black text-lg text-white flex items-center gap-2">
-                <Edit3 className="w-5 h-5 text-amber-400" />
-                <span>Editar Receta: {selectedProduct.name}</span>
-              </h3>
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl">
+                  <Edit3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xl text-white">
+                    Editar Receta: {selectedProduct.name}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Modifica la composición de insumos (BOM), costos y opciones de servicio en POS
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowEditModal(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+                className="w-9 h-9 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold transition-colors"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditedRecipe} className="space-y-4">
-              {/* Nombres y Precios en Cuadrícula Responsiva de 2 Columnas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="min-w-0">
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Nombre Completo (Carta / Clientes)</label>
-                  <input
-                    type="text"
-                    required
-                    value={editProductName}
-                    onChange={e => setEditProductName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+            {/* Selector de Pestañas */}
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+              <button
+                type="button"
+                onClick={() => setEditRecipeActiveTab('bom')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+                  editRecipeActiveTab === 'bom'
+                    ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                    : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>1. Ficha del Plato & Insumos (BOM)</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                    editRecipeActiveTab === 'bom' ? 'bg-slate-950 text-amber-300' : 'bg-slate-900 text-slate-400'
+                  }`}
+                >
+                  {editBomItems.length}
+                </span>
+              </button>
 
-                <div className="min-w-0">
-                  <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center justify-between">
-                    <span>Nombre Corto (Comanda / KDS)</span>
-                    <span className="text-[10px] text-slate-400 font-normal">Para barra (&lt; 3 min)</span>
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Mixto Caliente"
-                    value={editProductShortName}
-                    onChange={e => setEditProductShortName(e.target.value)}
-                    className="w-full bg-slate-950 border border-amber-500/50 text-amber-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none placeholder-amber-400/30"
-                  />
-                </div>
-
-                <div className="min-w-0">
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Precio Carta (S/)</label>
-                  <input
-                    type="number"
-                    step="any"
-                    required
-                    value={editProductPrice}
-                    onChange={e => setEditProductPrice(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="min-w-0 flex flex-col justify-end">
-                  <div className="p-2.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-                    <span className="text-slate-400 font-medium">SKU Operativo:</span>
-                    <span className="font-mono font-bold text-amber-400">{selectedProduct.sku}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notas de Preparación & Descripción de Carta */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
-                  <span>Notas de Preparación / Descripción de Carta (Opcional)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Instrucciones para barra o detalle en carta</span>
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ej: Licuar a velocidad media. Servir con sorbete de papel y rodaja de limón..."
-                  value={editProductDescription}
-                  onChange={e => setEditProductDescription(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:border-amber-500 resize-none"
-                />
-              </div>
-
-              {/* SECCIÓN DE PERSONALIZACIONES & TOPPINGS (MODIFICADORES) */}
-              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3.5">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                      <span>✨</span> Personalizaciones Base & Toppings Maestros
-                    </h4>
-                    <p className="text-[11px] text-slate-400">
-                      Personalizaciones de preparación (ej. Sin Azúcar) y Toppings con descuento estricto de inventario.
-                    </p>
-                  </div>
-                </div>
-
-                {/* 1. PERSONALIZACIONES BASE (Modificadores de preparación) */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    1. Modificadores Base de Preparación:
+              {selectedProduct.recipeType !== 'base' && (
+                <button
+                  type="button"
+                  onClick={() => setEditRecipeActiveTab('options')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all ${
+                    editRecipeActiveTab === 'options'
+                      ? 'bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20'
+                      : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>2. Opciones, Toppings & Servido (POS)</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono ${
+                      editRecipeActiveTab === 'options' ? 'bg-slate-950 text-cyan-300' : 'bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    {editFlavorSlots.length + editQuickModifiers.length + editServingOptions.length}
                   </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: 'mod-sin-azucar', label: 'Sin Azúcar', priceDelta: 0, cancelsSugar: true },
-                      { id: 'mod-poco-dulce', label: 'Poco Dulce', priceDelta: 0 },
-                      { id: 'mod-al-tiempo', label: 'Al Tiempo', priceDelta: 0 },
-                      { id: 'mod-con-hielo', label: 'Bien Helado', priceDelta: 0 },
-                    ].map(preset => {
-                      const alreadyAdded = editQuickModifiers.some(m => m.id === preset.id || m.label.toLowerCase() === preset.label.toLowerCase());
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          disabled={alreadyAdded}
-                          onClick={() => {
-                            if (!alreadyAdded) {
-                              setEditQuickModifiers(prev => [
-                                ...prev,
-                                {
-                                  id: preset.id,
-                                  label: preset.label,
-                                  priceDelta: preset.priceDelta
-                                }
-                              ]);
-                            }
-                          }}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
-                            alreadyAdded
-                              ? 'bg-slate-800/50 border-slate-800 text-slate-500 cursor-not-allowed'
-                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-500 hover:text-amber-300 active:scale-95'
-                          }`}
-                        >
-                          <span>+</span>
-                          <span>{preset.label}</span>
-                          {preset.cancelsSugar && <span className="text-[9px] text-cyan-400 font-mono">[Anula azúcar]</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
+                </button>
+              )}
+            </div>
 
-                  {/* Instrucción personalizada libre (S/ 0.00) */}
-                  <div className="flex gap-2 pt-1">
-                    <input
-                      type="text"
-                      placeholder="Otra instrucción base (ej. Sin sorbete, Poco hielo, Tibio)..."
-                      value={newModLabel}
-                      onChange={e => setNewModLabel(e.target.value)}
-                      className="flex-1 bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500"
-                    />
-                    <button
-                      type="button"
-                      disabled={!newModLabel.trim()}
-                      onClick={() => {
-                        if (newModLabel.trim()) {
-                          setEditQuickModifiers(prev => [
-                            ...prev,
-                            {
-                              id: `mod-custom-${Date.now()}`,
-                              label: newModLabel.trim(),
-                              priceDelta: 0
-                            }
-                          ]);
-                          setNewModLabel('');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-bold rounded-xl text-xs whitespace-nowrap active:scale-95"
-                    >
-                      + Añadir Base
-                    </button>
-                  </div>
-                </div>
-
-                {/* 2. TOPPINGS MAESTROS OFICIALES (Vinculados a Insumos / Subrecetas) */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                      2. Toppings Maestros (Descuentan Inventario por Porción):
+            <form onSubmit={handleSaveEditedRecipe} className="space-y-4">
+              {/* ================= PESTAÑA 1: FICHA & BOM ================= */}
+              {editRecipeActiveTab === 'bom' && (
+                <div className="space-y-4 animate-in fade-in">
+                  {/* Datos del Plato */}
+                  <div className="p-4 bg-slate-950/70 rounded-2xl border border-slate-800/90 space-y-3">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                      Datos Generales de Carta:
                     </span>
-                    <span className="text-[10px] text-slate-500">
-                      Solo desde Catálogo Maestro
-                    </span>
-                  </div>
 
-                  {toppingsMaster.length === 0 ? (
-                    <div className="p-2 bg-slate-900 rounded-xl text-center text-xs text-slate-400">
-                      No hay toppings registrados en el Catálogo Maestro de Toppings.
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="min-w-0">
+                        <label className="block text-xs font-bold text-slate-300 mb-1">Nombre Completo (Carta / Clientes) *</label>
+                        <input
+                          type="text"
+                          required
+                          value={editProductName}
+                          onChange={e => setEditProductName(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center justify-between">
+                          <span>Nombre Corto (Comanda / KDS)</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Para barra (&lt; 3 min)</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Ej. Mixto Caliente"
+                          value={editProductShortName}
+                          onChange={e => setEditProductShortName(e.target.value)}
+                          className="w-full bg-slate-900 border border-amber-500/50 text-amber-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none placeholder-amber-400/30"
+                        />
+                      </div>
+
+                      <div className="min-w-0">
+                        <label className="block text-xs font-bold text-slate-300 mb-1">Precio Carta (S/)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          required
+                          value={editProductPrice}
+                          onChange={e => setEditProductPrice(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex flex-col justify-end">
+                        <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
+                          <span className="text-slate-400 font-medium">SKU Operativo:</span>
+                          <span className="font-mono font-bold text-amber-400">{selectedProduct.sku}</span>
+                        </div>
+                      </div>
                     </div>
-                  ) : (
+
+                    {/* Notas de Preparación */}
+                    <div className="space-y-1">
+                      <label className="block text-xs font-bold text-slate-300 flex items-center justify-between">
+                        <span>Notas de Preparación / Descripción de Carta (Opcional)</span>
+                        <span className="text-[10px] text-slate-400 font-normal">Instrucciones para barra o detalle en carta</span>
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ej: Licuar a velocidad media. Servir con sorbete de papel y rodaja de limón..."
+                        value={editProductDescription}
+                        onChange={e => setEditProductDescription(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-medium focus:outline-none focus:border-amber-500 resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Composición de Insumos BOM (PRIMERO) */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-xs font-black text-amber-300 uppercase tracking-wider block">
+                          Composición de Insumos & Descartables (BOM) — Búsqueda Inteligente
+                        </label>
+                        <p className="text-[11px] text-slate-400">
+                          Insumos alimenticios base y descartables fijos vinculados a esta receta.
+                        </p>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 font-mono">
+                        {editBomItems.length} componentes
+                      </span>
+                    </div>
+
                     <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
                       <div className="flex-1 min-w-0">
                         <SearchableSelect
-                          options={toppingOptions}
-                          value={selectedToppingId}
-                          onChange={setSelectedToppingId}
-                          placeholder="Buscar topping por nombre o porción..."
-                          searchPlaceholder="Escribe: leche deslactosada, chantilly, fudge..."
+                          options={ingredientOptions}
+                          value={editTempIngId}
+                          onChange={setEditTempIngId}
+                          placeholder="Escribe para buscar insumo o subreceta..."
+                          searchPlaceholder="Buscar: fresa, leche, cmc, base..."
                           isLight={isLight}
                         />
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const tm = toppingsMaster.find(t => t.id === selectedToppingId) || toppingsMaster[0];
-                          if (tm) {
-                            const alreadyAdded = editQuickModifiers.some(
-                              m => m.toppingMasterId === tm.id || m.label.toLowerCase() === `+ ${tm.name.toLowerCase()}`
-                            );
-                            if (!alreadyAdded) {
-                              setEditQuickModifiers(prev => [
-                                ...prev,
-                                {
-                                  id: `mod-top-${tm.id}`,
-                                  label: `+ ${tm.name}`,
-                                  priceDelta: tm.defaultPriceDelta,
-                                  toppingMasterId: tm.id,
-                                  ingredientId: tm.ingredientId,
-                                  quantity: tm.portionQuantity,
-                                  unit: tm.portionUnit,
-                                  hasVariants: tm.hasVariants,
-                                  variantCategory: tm.variantCategory,
-                                  allowedIngredientIds: tm.allowedIngredientIds
-                                }
-                              ]);
-                            }
-                          }
-                        }}
-                        className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center justify-center gap-1"
-                      >
-                        <span>+ Añadir Topping</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="Cant."
+                          value={editTempQty}
+                          onChange={e => setEditTempQty(e.target.value)}
+                          className="w-24 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
+                        />
 
-                {/* 3. LISTA DE MODIFICADORES ASIGNADOS */}
-                <div className="space-y-1.5 h-auto pr-1 pt-1 border-t border-slate-800/80">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    Modificadores Asignados ({editQuickModifiers.length}):
-                  </span>
-                  {editQuickModifiers.length === 0 ? (
-                    <p className="text-[11px] text-slate-500 italic py-1">
-                      No hay modificadores ni toppings asignados a esta receta.
-                    </p>
-                  ) : (
-                    editQuickModifiers.map((mod, idx) => {
-                      const isSinAzucar = mod.id === 'mod-sin-azucar' || mod.label.toLowerCase().includes('sin azucar') || mod.label.toLowerCase().includes('sin azúcar');
-                      const linkedIng = mod.ingredientId ? ingredients.find(i => i.id === mod.ingredientId) : undefined;
-                      const hasPortion = Boolean(mod.quantity && mod.quantity > 0);
-                      const catObj = mod.variantCategory ? ingredientCategories.find(c => c.id === mod.variantCategory) : undefined;
-
-                      return (
-                        <div
-                          key={mod.id || idx}
-                          className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs"
+                        <button
+                          type="button"
+                          onClick={handleAddEditBomItem}
+                          className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center gap-1"
                         >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-white">{mod.label}</span>
-                            {isSinAzucar && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30">
-                                🚫 Anula consumo de azúcar en almacén
-                              </span>
-                            )}
-                            {mod.hasVariants ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 font-mono">
-                                ✨ Selección en POS: {mod.quantity} {mod.unit} ({catObj ? `${catObj.icon || '🏷️'} ${catObj.name}` : mod.variantCategory || 'Sabor a elección'})
-                              </span>
-                            ) : hasPortion ? (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
-                                📦 Descuenta: {mod.quantity} {mod.unit || linkedIng?.unit} de {linkedIng?.name || 'almacén'}
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono text-emerald-400 font-bold">
-                              {mod.priceDelta > 0 ? `+ S/ ${mod.priceDelta.toFixed(2)}` : 'S/ 0.00'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setEditQuickModifiers(prev => prev.filter((_, i) => i !== idx))}
-                              className="text-rose-400 hover:text-rose-300 font-bold px-1"
-                              title="Quitar modificador"
+                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Añadir</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Lista de Insumos en la Edición */}
+                    {editBomItems.length === 0 ? (
+                      <div className="p-4 bg-slate-900/60 rounded-xl text-center text-xs text-slate-500 italic border border-slate-800">
+                        No hay insumos en esta receta aún.
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 mt-2 max-h-60 overflow-y-auto pr-1">
+                        {editBomItems.map((b, i) => {
+                          const ing = ingredients.find(ing => ing.id === b.ingredientId);
+                          const cost = (ing?.costPerUnit || 0) * b.quantity;
+                          return (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl border border-slate-800 text-xs"
                             >
-                              ✕
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-
-              {/* Insumos BOM de la Receta */}
-              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-2">
-                <label className="block text-xs font-bold text-amber-300">
-                  Composición de Insumos & Descartables (BOM) — Búsqueda Inteligente
-                </label>
-                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                  <div className="flex-1 min-w-0">
-                    <SearchableSelect
-                      options={ingredientOptions}
-                      value={editTempIngId}
-                      onChange={setEditTempIngId}
-                      placeholder="Escribe para buscar insumo o subreceta..."
-                      searchPlaceholder="Buscar: fresa, leche, cmc, base..."
-                      isLight={isLight}
-                    />
+                              <div className="flex items-center gap-2.5">
+                                <span className="text-base">{ing?.icon || '📦'}</span>
+                                <div>
+                                  <span className="text-white font-bold block">{ing?.name || b.ingredientId}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    Costo: S/ {(ing?.costPerUnit || 0).toFixed(2)} / {ing?.unit}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-amber-400 font-mono font-bold">
+                                  {b.quantity} {b.unit}
+                                </span>
+                                <span className="text-slate-300 font-mono font-bold">
+                                  S/ {cost.toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveEditBomItem(i)}
+                                  className="text-rose-400 hover:text-rose-300 p-1 hover:bg-rose-500/10 rounded transition-colors"
+                                  title="Quitar de la receta"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="Cant."
-                      value={editTempQty}
-                      onChange={e => setEditTempQty(e.target.value)}
-                      className="w-24 bg-slate-900 border border-slate-700 text-white font-bold rounded-xl p-2 text-xs focus:outline-none text-center"
-                    />
+                  {/* Métricas Recalculadas en la Edición */}
+                  {(() => {
+                    const editedEdibleItems = editBomItems.filter(b => {
+                      const ing = ingredients.find(i => i.id === b.ingredientId);
+                      return !b.isDisposable && ing?.itemType !== 'descartable';
+                    });
+                    const editSlotsCost = calculateSlotsCost(editFlavorSlots);
+                    const editedEdibleCost = calculateBomCost(editedEdibleItems) + editSlotsCost;
+                    const editedCost = calculateBomCost(editBomItems) + editSlotsCost;
+                    const editedSuggested30 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.30).toFixed(2)) : 0;
+                    const editedFloor45 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.45).toFixed(2)) : 0;
+                    const editedPriceNum = parseFloat(editProductPrice) || 0;
+                    const editedFc = editedPriceNum > 0 ? Number(((editedEdibleCost / editedPriceNum) * 100).toFixed(1)) : 0;
 
-                    <button
-                      type="button"
-                      onClick={handleAddEditBomItem}
-                      className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all"
-                    >
-                      + Añadir
-                    </button>
-                  </div>
-                </div>
-
-                {/* Lista de Insumos en la Edición */}
-                <div className="space-y-1.5 mt-2 h-auto pr-1">
-                  {editBomItems.map((b, i) => {
-                    const ing = ingredients.find(ing => ing.id === b.ingredientId);
-                    const cost = (ing?.costPerUnit || 0) * b.quantity;
                     return (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-xl text-xs"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-bold">{ing?.name || b.ingredientId}</span>
-                          <span className="text-amber-400 font-mono font-bold">
-                            {b.quantity} {b.unit}
-                          </span>
+                      <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div>
+                          <span className="text-slate-400 block">Costo Comestible (Salón):</span>
+                          <div className="font-black text-white text-lg">S/ {editedEdibleCost.toFixed(2)}</div>
+                          <span className="text-[10px] text-slate-500">Total Llevar: S/ {editedCost.toFixed(2)}</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-slate-400 font-mono">S/ {cost.toFixed(2)}</span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveEditBomItem(i)}
-                            className="text-rose-400 hover:text-rose-300 font-bold px-1"
-                          >
-                            ✕
-                          </button>
+                        <div>
+                          <span className="text-slate-400 block">Food Cost Salón:</span>
+                          <div className={`font-black text-lg ${editedFc <= 30 ? 'text-emerald-400' : editedFc <= 45 ? 'text-amber-400' : 'text-rose-400'}`}>
+                            {editedFc}%
+                          </div>
+                          <span className="text-[10px] text-slate-500">Meta: ≤30%</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-amber-300 font-bold block">Precio Sugerido (30% FC):</span>
+                          <div className="font-black text-amber-400 text-xl">S/ {editedSuggested30.toFixed(2)}</div>
+                          <span className="text-[10px] text-slate-400 font-mono">Piso 45%: S/ {editedFloor45.toFixed(2)}</span>
                         </div>
                       </div>
                     );
-                  })}
+                  })()}
                 </div>
-              </div>
+              )}
 
-              {/* SECCIÓN OPCIONAL: Ranuras de Insumo Variable / A Elección del Cliente (Panes, Helados, Leches, Jarabes, etc.) */}
-              <div className="p-3.5 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5">
-                      <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
-                    </h4>
-                    <p className="text-[10px] text-slate-400">
-                      Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextIdx = editFlavorSlots.length;
-                      const defaultCat = availableIngredientCategories[0]?.id || 'helados';
-                      const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
-                      const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
-
-                      setEditFlavorSlots(prev => [
-                        ...prev,
-                        {
-                          slotIndex: nextIdx,
-                          label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
-                          category: defaultCat,
-                          quantity: catConfig.defaultQty || 1,
-                          unit: (catConfig.defaultUnit as any) || 'und',
-                          required: true,
-                          allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
-                        }
-                      ]);
-                    }}
-                    className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Añadir Opción Variable</span>
-                  </button>
-                </div>
-
-                {editFlavorSlots.length > 0 && (
-                  <div className="space-y-3 pt-1">
-                    {editFlavorSlots.map((slot, sIdx) => {
-                      const slotCost = calculateSlotCost(slot);
-                      const currentCat = slot.category || 'todas';
-                      const categoryIngredients = currentCat === 'todas'
-                        ? ingredients
-                        : ingredients.filter(i => i.category === currentCat);
-
-                      return (
-                        <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
-                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
-                            {/* Nombre de la Ranura */}
-                            <div className="flex items-center gap-2 flex-1">
-                              <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
-                              <input
-                                type="text"
-                                value={slot.label}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
-                                }}
-                                className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
-                                placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
-                              />
-                            </div>
-
-                            {/* Selector de Categoría Vinculada */}
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
-                              <select
-                                value={currentCat}
-                                onChange={e => {
-                                  const newCat = e.target.value;
-                                  const catConf = availableIngredientCategories.find(c => c.id === newCat);
-                                  const allowed = newCat === 'todas'
-                                    ? undefined
-                                    : ingredients.filter(i => i.category === newCat).map(i => i.id);
-
-                                  setEditFlavorSlots(prev => prev.map((s, i) => {
-                                    if (i !== sIdx) return s;
-                                    return {
-                                      ...s,
-                                      category: newCat,
-                                      quantity: catConf?.defaultQty || s.quantity,
-                                      unit: (catConf?.defaultUnit as any) || s.unit,
-                                      label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
-                                      allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
-                                    };
-                                  }));
-                                }}
-                                className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
-                              >
-                                {availableIngredientCategories.map(cat => (
-                                  <option key={cat.id} value={cat.id}>
-                                    {cat.label}
-                                  </option>
-                                ))}
-                              </select>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
-                                }}
-                                className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
-                                title="Eliminar ranura"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Porción, Unidad y Resumen de Opciones */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
-                            <div className="flex items-center gap-2">
-                              <span className="text-slate-400">Porción descontada:</span>
-                              <input
-                                type="number"
-                                step="any"
-                                value={slot.quantity}
-                                onChange={e => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
-                                }}
-                                className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
-                              />
-                              <select
-                                value={slot.unit}
-                                onChange={e => {
-                                  const u = e.target.value as any;
-                                  setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
-                                }}
-                                className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
-                              >
-                                <option value="und">und</option>
-                                <option value="L">L</option>
-                                <option value="kg">kg</option>
-                                <option value="ml">ml</option>
-                                <option value="g">g</option>
-                              </select>
-                              <span className="text-emerald-400 font-mono font-bold">
-                                ~S/ {slotCost.toFixed(2)} / porción
-                              </span>
-                            </div>
-
-                            <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                              <span className="text-cyan-400 font-bold">
-                                {categoryIngredients.length} insumos elegibles:
-                              </span>
-                              <span className="truncate max-w-[200px] text-slate-300">
-                                {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
-                                {categoryIngredients.length > 3 ? '...' : ''}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* SECCIÓN OPCIONAL: Presentaciones / Formas de Servido */}
-              <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <span>🍽️</span>
-                      <span>Presentación & Formas de Servido (Opcional)</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400 block">
-                      Define opciones de presentación (ej. "En Plato", "Para Llevar en Caja Kraft", "Vaso Vidrio"). Si no aplica, déjalo vacío.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newId = `srv-${Date.now()}`;
-                      setEditServingOptions(prev => [
-                        ...prev,
-                        {
-                          id: newId,
-                          name: '',
-                          priceDelta: 0
-                        }
-                      ]);
-                    }}
-                    className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                    <span>+ Añadir Opción</span>
-                  </button>
-                </div>
-
-                {editServingOptions.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 italic py-1">
-                    Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
-                  </p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {editServingOptions.map((srv, srvIdx) => {
-                      const currentDisposables = (srv.disposables && srv.disposables.length > 0)
-                        ? srv.disposables
-                        : srv.ingredientId
-                        ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
-                        : [];
-
-                      return (
-                        <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
-                          {/* Fila principal: Nombre, Recargo y Eliminar */}
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="flex-1 min-w-[200px]">
-                              <input
-                                type="text"
-                                required
-                                placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
-                                value={srv.name}
-                                onChange={e => {
-                                  const val = e.target.value;
-                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
-                                }}
-                                className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
-                              />
-                            </div>
-
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
-                              <input
-                                type="number"
-                                step="any"
-                                placeholder="+ S/ 0.00"
-                                value={srv.priceDelta || 0}
-                                onChange={e => {
-                                  const val = parseFloat(e.target.value) || 0;
-                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
-                                }}
-                                className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
-                              />
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setEditServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
-                              className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
-                              title="Eliminar presentación"
-                            >
-                              ✕
-                            </button>
-                          </div>
-
-                          {/* Sub-lista de descartables que descuenta */}
-                          <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
-                                <span>📦</span>
-                                <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const defaultId = disposableIngredients[0]?.id || '';
-                                  const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
-                                  setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                }}
-                                className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
-                              >
-                                <Plus className="w-3 h-3 stroke-[3]" />
-                                <span>+ Agregar Descartable</span>
-                              </button>
-                            </div>
-
-                            {currentDisposables.length === 0 ? (
-                              <p className="text-[10px] text-slate-500 italic">
-                                🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
-                              </p>
-                            ) : (
-                              <div className="space-y-1.5">
-                                {currentDisposables.map((disp, dIdx) => (
-                                  <div key={dIdx} className="flex items-center gap-2 text-xs">
-                                    <select
-                                      value={disp.ingredientId}
-                                      onChange={e => {
-                                        const newId = e.target.value;
-                                        const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
-                                        setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                      }}
-                                      className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
-                                    >
-                                      {disposableIngredients.map(ing => (
-                                        <option key={ing.id} value={ing.id}>
-                                          {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
-                                        </option>
-                                      ))}
-                                    </select>
-
-                                    <div className="flex items-center gap-1 shrink-0">
-                                      <input
-                                        type="number"
-                                        step="1"
-                                        min="1"
-                                        value={disp.quantity}
-                                        onChange={e => {
-                                          const qty = parseFloat(e.target.value) || 1;
-                                          const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
-                                          setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                        }}
-                                        className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
-                                      />
-                                      <span className="text-[10px] text-slate-400 font-mono">und</span>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const next = currentDisposables.filter((_, idx) => idx !== dIdx);
-                                        setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
-                                      }}
-                                      className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
-                                      title="Quitar descartable"
-                                    >
-                                      ✕
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Métricas Recalculadas en la Edición */}
-              {(() => {
-                const editedEdibleItems = editBomItems.filter(b => {
-                  const ing = ingredients.find(i => i.id === b.ingredientId);
-                  return !b.isDisposable && ing?.itemType !== 'descartable';
-                });
-                const editSlotsCost = calculateSlotsCost(editFlavorSlots);
-                const editedEdibleCost = calculateBomCost(editedEdibleItems) + editSlotsCost;
-                const editedCost = calculateBomCost(editBomItems) + editSlotsCost;
-                const editedSuggested30 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.30).toFixed(2)) : 0;
-                const editedFloor45 = editedEdibleCost > 0 ? Number((editedEdibleCost / 0.45).toFixed(2)) : 0;
-                const editedPriceNum = parseFloat(editProductPrice) || 0;
-                const editedFc = editedPriceNum > 0 ? Number(((editedEdibleCost / editedPriceNum) * 100).toFixed(1)) : 0;
-
-                return (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs">
-                    <div>
-                      <span className="text-slate-400">Costo Comestible (Salón):</span>
-                      <div className="font-black text-white text-sm">S/ {editedEdibleCost.toFixed(2)}</div>
-                      <span className="text-[10px] text-slate-500">Total Llevar: S/ {editedCost.toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Food Cost Salón:</span>
-                      <div className={`font-black text-sm ${editedFc <= 30 ? 'text-emerald-400' : editedFc <= 45 ? 'text-amber-400' : 'text-rose-400'}`}>
-                        {editedFc}%
+              {/* ================= PESTAÑA 2: OPCIONES & TOPPINGS POS ================= */}
+              {editRecipeActiveTab === 'options' && selectedProduct.recipeType !== 'base' && (
+                <div className="space-y-4 animate-in fade-in">
+                  {/* SECCIÓN 1: Ranuras de Insumo Variable / A Elección */}
+                  <div className="p-4 bg-cyan-950/30 border border-cyan-500/30 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="text-xs font-black text-cyan-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <span>✨</span> Ranuras de Insumo Variable / A Elección (Panes, Helados, Leches, etc.)
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Configura qué opciones elegirá el mesero al tomar el pedido (ej. Tipo de Pan, Bola de Helado, Sabor de Jarabe).
+                        </p>
                       </div>
-                      <span className="text-[10px] text-slate-500">Meta: ≤30%</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const nextIdx = editFlavorSlots.length;
+                          const defaultCat = availableIngredientCategories[0]?.id || 'helados';
+                          const catConfig = availableIngredientCategories[0] || { label: 'Opción a Elección', defaultQty: 1, defaultUnit: 'und' };
+                          const defaultAllowed = defaultCat ? ingredients.filter(i => i.category === defaultCat).map(i => i.id) : [];
+
+                          setEditFlavorSlots(prev => [
+                            ...prev,
+                            {
+                              slotIndex: nextIdx,
+                              label: `Opción ${nextIdx + 1} (${catConfig.label || 'Elección'})`,
+                              category: defaultCat,
+                              quantity: catConfig.defaultQty || 1,
+                              unit: (catConfig.defaultUnit as any) || 'und',
+                              required: true,
+                              allowedIngredientIds: defaultAllowed.length > 0 ? defaultAllowed : undefined
+                            }
+                          ]);
+                        }}
+                        className="px-3.5 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-1 shadow transition-all active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Añadir Opción Variable</span>
+                      </button>
                     </div>
-                    <div className="text-right">
-                      <span className="text-amber-300 font-bold">Precio Sugerido (30%):</span>
-                      <div className="font-black text-amber-400 text-base">S/ {editedSuggested30.toFixed(2)}</div>
-                      <span className="text-[10px] text-slate-400 font-mono">Piso 45%: S/ {editedFloor45.toFixed(2)}</span>
+
+                    {editFlavorSlots.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-1">
+                        Sin ranuras variables. El producto no preguntará por sabores ni panes al tomar pedido.
+                      </p>
+                    ) : (
+                      <div className="space-y-3 pt-1">
+                        {editFlavorSlots.map((slot, sIdx) => {
+                          const slotCost = calculateSlotCost(slot);
+                          const currentCat = slot.category || 'todas';
+                          const categoryIngredients = currentCat === 'todas'
+                            ? ingredients
+                            : ingredients.filter(i => i.category === currentCat);
+
+                          return (
+                            <div key={sIdx} className="bg-slate-900 border border-cyan-500/20 rounded-xl p-3 space-y-2.5 text-xs">
+                              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-1">
+                                  <span className="font-bold text-cyan-400 shrink-0">Opción {sIdx + 1}:</span>
+                                  <input
+                                    type="text"
+                                    value={slot.label}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, label: val } : s));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-white rounded-lg px-2.5 py-1 text-xs font-semibold flex-1 focus:border-cyan-500 focus:outline-none"
+                                    placeholder="Ej. Tipo de Pan, Bola 1, Tipo de Leche"
+                                  />
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-slate-400 shrink-0">Categoría:</span>
+                                  <select
+                                    value={currentCat}
+                                    onChange={e => {
+                                      const newCat = e.target.value;
+                                      const catConf = availableIngredientCategories.find(c => c.id === newCat);
+                                      const allowed = newCat === 'todas'
+                                        ? undefined
+                                        : ingredients.filter(i => i.category === newCat).map(i => i.id);
+
+                                      setEditFlavorSlots(prev => prev.map((s, i) => {
+                                        if (i !== sIdx) return s;
+                                        return {
+                                          ...s,
+                                          category: newCat,
+                                          quantity: catConf?.defaultQty || s.quantity,
+                                          unit: (catConf?.defaultUnit as any) || s.unit,
+                                          label: s.label.startsWith('Opción') ? `Opción ${sIdx + 1} (${catConf?.label || 'Elección'})` : s.label,
+                                          allowedIngredientIds: allowed && allowed.length > 0 ? allowed : undefined
+                                        };
+                                      }));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-cyan-300 font-bold rounded-lg px-2 py-1 text-xs focus:border-cyan-500 focus:outline-none"
+                                  >
+                                    {availableIngredientCategories.map(cat => (
+                                      <option key={cat.id} value={cat.id}>
+                                        {cat.label}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditFlavorSlots(prev => prev.filter((_, i) => i !== sIdx).map((s, idx) => ({ ...s, slotIndex: idx })));
+                                    }}
+                                    className="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 hover:bg-rose-500/10 rounded"
+                                    title="Eliminar ranura"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80 text-[11px]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-slate-400">Porción descontada:</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    value={slot.quantity}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, quantity: val } : s));
+                                    }}
+                                    className="w-16 bg-slate-950 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs text-center font-bold"
+                                  />
+                                  <select
+                                    value={slot.unit}
+                                    onChange={e => {
+                                      const u = e.target.value as any;
+                                      setEditFlavorSlots(prev => prev.map((s, i) => i === sIdx ? { ...s, unit: u } : s));
+                                    }}
+                                    className="bg-slate-950 border border-slate-700 text-amber-400 font-mono rounded-lg px-1.5 py-0.5 text-xs font-bold"
+                                  >
+                                    <option value="und">und</option>
+                                    <option value="L">L</option>
+                                    <option value="kg">kg</option>
+                                    <option value="ml">ml</option>
+                                    <option value="g">g</option>
+                                  </select>
+                                  <span className="text-emerald-400 font-mono font-bold">
+                                    ~S/ {slotCost.toFixed(2)} / porción
+                                  </span>
+                                </div>
+
+                                <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                                  <span className="text-cyan-400 font-bold">
+                                    {categoryIngredients.length} insumos elegibles:
+                                  </span>
+                                  <span className="truncate max-w-[200px] text-slate-300">
+                                    {categoryIngredients.map(i => i.name.replace(/^(Helado |Pan )/i, '')).slice(0, 3).join(', ')}
+                                    {categoryIngredients.length > 3 ? '...' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* SECCIÓN 2: Personalizaciones Base & Toppings Maestros */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3.5">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <div>
+                        <h4 className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                          <span>✨</span> Personalizaciones Base & Toppings Maestros
+                        </h4>
+                        <p className="text-[11px] text-slate-400">
+                          Personalizaciones de preparación (ej. Sin Azúcar) y Toppings con descuento estricto de inventario.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 1. Modificadores Base */}
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        1. Modificadores Base de Preparación:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          { id: 'mod-sin-azucar', label: 'Sin Azúcar', priceDelta: 0, cancelsSugar: true },
+                          { id: 'mod-poco-dulce', label: 'Poco Dulce', priceDelta: 0 },
+                          { id: 'mod-al-tiempo', label: 'Al Tiempo', priceDelta: 0 },
+                          { id: 'mod-con-hielo', label: 'Bien Helado', priceDelta: 0 },
+                        ].map(preset => {
+                          const alreadyAdded = editQuickModifiers.some(m => m.id === preset.id || m.label.toLowerCase() === preset.label.toLowerCase());
+                          return (
+                            <button
+                              key={preset.id}
+                              type="button"
+                              disabled={alreadyAdded}
+                              onClick={() => {
+                                if (!alreadyAdded) {
+                                  setEditQuickModifiers(prev => [
+                                    ...prev,
+                                    {
+                                      id: preset.id,
+                                      label: preset.label,
+                                      priceDelta: preset.priceDelta
+                                    }
+                                  ]);
+                                }
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all flex items-center gap-1 ${
+                                alreadyAdded
+                                  ? 'bg-slate-800/50 border-slate-800 text-slate-500 cursor-not-allowed'
+                                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-amber-500 hover:text-amber-300 active:scale-95'
+                              }`}
+                            >
+                              <span>+</span>
+                              <span>{preset.label}</span>
+                              {preset.cancelsSugar && <span className="text-[9px] text-cyan-400 font-mono">[Anula azúcar]</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          placeholder="Otra instrucción base (ej. Sin sorbete, Poco hielo, Tibio)..."
+                          value={newModLabel}
+                          onChange={e => setNewModLabel(e.target.value)}
+                          className="flex-1 bg-slate-900 border border-slate-800 text-white rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={!newModLabel.trim()}
+                          onClick={() => {
+                            if (newModLabel.trim()) {
+                              setEditQuickModifiers(prev => [
+                                ...prev,
+                                {
+                                  id: `mod-custom-${Date.now()}`,
+                                  label: newModLabel.trim(),
+                                  priceDelta: 0
+                                }
+                              ]);
+                              setNewModLabel('');
+                            }
+                          }}
+                          className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 font-bold rounded-xl text-xs whitespace-nowrap active:scale-95"
+                        >
+                          + Añadir Base
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Toppings Maestros */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                          2. Toppings Maestros (Descuentan Inventario por Porción):
+                        </span>
+                        <span className="text-[10px] text-slate-500">Solo desde Catálogo Maestro</span>
+                      </div>
+
+                      {toppingsMaster.length === 0 ? (
+                        <div className="p-2 bg-slate-900 rounded-xl text-center text-xs text-slate-400">
+                          No hay toppings registrados en el Catálogo Maestro de Toppings.
+                        </div>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                          <div className="flex-1 min-w-0">
+                            <SearchableSelect
+                              options={toppingOptions}
+                              value={selectedToppingId}
+                              onChange={setSelectedToppingId}
+                              placeholder="Buscar topping por nombre o porción..."
+                              searchPlaceholder="Escribe: leche deslactosada, chantilly, fudge..."
+                              isLight={isLight}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const tm = toppingsMaster.find(t => t.id === selectedToppingId) || toppingsMaster[0];
+                              if (tm) {
+                                const alreadyAdded = editQuickModifiers.some(
+                                  m => m.toppingMasterId === tm.id || m.label.toLowerCase() === `+ ${tm.name.toLowerCase()}`
+                                );
+                                if (!alreadyAdded) {
+                                  setEditQuickModifiers(prev => [
+                                    ...prev,
+                                    {
+                                      id: `mod-top-${tm.id}`,
+                                      label: `+ ${tm.name}`,
+                                      priceDelta: tm.defaultPriceDelta,
+                                      toppingMasterId: tm.id,
+                                      ingredientId: tm.ingredientId,
+                                      quantity: tm.portionQuantity,
+                                      unit: tm.portionUnit,
+                                      hasVariants: tm.hasVariants,
+                                      variantCategory: tm.variantCategory,
+                                      allowedIngredientIds: tm.allowedIngredientIds
+                                    }
+                                  ]);
+                                }
+                              }
+                            }}
+                            className="shrink-0 px-3.5 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs whitespace-nowrap active:scale-95 shadow transition-all flex items-center justify-center gap-1"
+                          >
+                            <span>+ Añadir Topping</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. Lista de Modificadores Asignados */}
+                    <div className="space-y-1.5 h-auto pr-1 pt-1 border-t border-slate-800/80">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                        Modificadores Asignados ({editQuickModifiers.length}):
+                      </span>
+                      {editQuickModifiers.length === 0 ? (
+                        <p className="text-[11px] text-slate-500 italic py-1">
+                          No hay modificadores ni toppings asignados a esta receta.
+                        </p>
+                      ) : (
+                        editQuickModifiers.map((mod, idx) => {
+                          const isSinAzucar = mod.id === 'mod-sin-azucar' || mod.label.toLowerCase().includes('sin azucar') || mod.label.toLowerCase().includes('sin azúcar');
+                          const linkedIng = mod.ingredientId ? ingredients.find(i => i.id === mod.ingredientId) : undefined;
+                          const hasPortion = Boolean(mod.quantity && mod.quantity > 0);
+                          const catObj = mod.variantCategory ? ingredientCategories.find(c => c.id === mod.variantCategory) : undefined;
+
+                          return (
+                            <div
+                              key={mod.id || idx}
+                              className="flex items-center justify-between bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs"
+                            >
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-white">{mod.label}</span>
+                                {isSinAzucar && (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 font-bold border border-cyan-500/30">
+                                    🚫 Anula consumo de azúcar en almacén
+                                  </span>
+                                )}
+                                {mod.hasVariants ? (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30 font-mono">
+                                    ✨ Selección en POS: {mod.quantity} {mod.unit} ({catObj ? `${catObj.icon || '🏷️'} ${catObj.name}` : mod.variantCategory || 'Sabor a elección'})
+                                  </span>
+                                ) : hasPortion ? (
+                                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30 font-mono">
+                                    📦 Descuenta: {mod.quantity} {mod.unit || linkedIng?.unit} de {linkedIng?.name || 'almacén'}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="font-mono text-emerald-400 font-bold">
+                                  {mod.priceDelta > 0 ? `+ S/ ${mod.priceDelta.toFixed(2)}` : 'S/ 0.00'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditQuickModifiers(prev => prev.filter((_, i) => i !== idx))}
+                                  className="text-rose-400 hover:text-rose-300 font-bold px-1"
+                                  title="Quitar modificador"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
-                );
-              })()}
 
-              <div className="flex gap-2 pt-2">
+                  {/* SECCIÓN 3: Presentaciones / Formas de Servido */}
+                  <div className="p-4 bg-slate-950/80 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+                          <span>🍽️</span>
+                          <span>Presentación & Formas de Servido (Opcional)</span>
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Define opciones de presentación (ej. "En Plato", "Para Llevar en Caja Kraft", "Vaso Vidrio"). Si no aplica, déjalo vacío.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newId = `srv-${Date.now()}`;
+                          setEditServingOptions(prev => [
+                            ...prev,
+                            {
+                              id: newId,
+                              name: '',
+                              priceDelta: 0
+                            }
+                          ]);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold flex items-center gap-1 transition-all active:scale-95"
+                      >
+                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>+ Añadir Opción</span>
+                      </button>
+                    </div>
+
+                    {editServingOptions.length === 0 ? (
+                      <p className="text-[11px] text-slate-500 italic py-1">
+                        Sin opciones de presentación. En el POS se cobrará directamente sin preguntar cómo servirlo.
+                      </p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {editServingOptions.map((srv, srvIdx) => {
+                          const currentDisposables = (srv.disposables && srv.disposables.length > 0)
+                            ? srv.disposables
+                            : srv.ingredientId
+                            ? [{ ingredientId: srv.ingredientId, quantity: 1 }]
+                            : [];
+
+                          return (
+                            <div key={srv.id || srvIdx} className="p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2.5 text-xs">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex-1 min-w-[200px]">
+                                  <input
+                                    type="text"
+                                    required
+                                    placeholder="Nombre: Ej. Para Llevar Completo / En Plato Salón / En Copa"
+                                    value={srv.name}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, name: val } : s));
+                                    }}
+                                    className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl px-3 py-1.5 text-xs font-bold focus:outline-none focus:border-amber-500"
+                                  />
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[11px] text-slate-400 font-bold">Recargo:</span>
+                                  <input
+                                    type="number"
+                                    step="any"
+                                    placeholder="+ S/ 0.00"
+                                    value={srv.priceDelta || 0}
+                                    onChange={e => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, priceDelta: val } : s));
+                                    }}
+                                    className="w-20 bg-slate-950 border border-slate-700 text-emerald-400 font-mono font-bold rounded-xl px-2 py-1.5 text-xs text-right focus:outline-none"
+                                  />
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setEditServingOptions(prev => prev.filter((_, i) => i !== srvIdx))}
+                                  className="p-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-xl font-bold shrink-0"
+                                  title="Eliminar presentación"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+
+                              <div className="p-2.5 bg-slate-950/70 border border-slate-800/80 rounded-xl space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[11px] font-bold text-cyan-300 flex items-center gap-1">
+                                    <span>📦</span>
+                                    <span>Descartables a descontar en esta presentación ({currentDisposables.length}):</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const defaultId = disposableIngredients[0]?.id || '';
+                                      const next = [...currentDisposables, { ingredientId: defaultId, quantity: 1 }];
+                                      setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                    }}
+                                    className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 rounded-lg text-[10px] font-bold flex items-center gap-1 transition-all"
+                                  >
+                                    <Plus className="w-3 h-3 stroke-[3]" />
+                                    <span>+ Agregar Descartable</span>
+                                  </button>
+                                </div>
+
+                                {currentDisposables.length === 0 ? (
+                                  <p className="text-[10px] text-slate-500 italic">
+                                    🍽️ Vajilla reutilizable (no descuenta descartables del almacén).
+                                  </p>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    {currentDisposables.map((disp, dIdx) => (
+                                      <div key={dIdx} className="flex items-center gap-2 text-xs">
+                                        <select
+                                          value={disp.ingredientId}
+                                          onChange={e => {
+                                            const newId = e.target.value;
+                                            const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, ingredientId: newId } : d);
+                                            setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                          }}
+                                          className="flex-1 min-w-0 bg-slate-900 border border-slate-700 text-slate-200 rounded-lg px-2 py-1 text-xs focus:outline-none"
+                                        >
+                                          {disposableIngredients.map(ing => (
+                                            <option key={ing.id} value={ing.id}>
+                                              {ing.name} (Stock: {ing.stock.toFixed(0)} {ing.unit})
+                                            </option>
+                                          ))}
+                                        </select>
+
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          <input
+                                            type="number"
+                                            step="1"
+                                            min="1"
+                                            value={disp.quantity}
+                                            onChange={e => {
+                                              const qty = parseFloat(e.target.value) || 1;
+                                              const next = currentDisposables.map((d, idx) => idx === dIdx ? { ...d, quantity: qty } : d);
+                                              setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                            }}
+                                            className="w-14 bg-slate-900 border border-slate-700 text-white font-mono font-bold rounded-lg px-2 py-1 text-xs text-center focus:outline-none"
+                                          />
+                                          <span className="text-[10px] text-slate-400 font-mono">und</span>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const next = currentDisposables.filter((_, idx) => idx !== dIdx);
+                                            setEditServingOptions(prev => prev.map((s, i) => i === srvIdx ? { ...s, disposables: next, ingredientId: undefined } : s));
+                                          }}
+                                          className="p-1 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 rounded font-bold shrink-0"
+                                          title="Quitar descartable"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Botones de Acción al pie del Modal */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={() => setShowEditModal(false)}
-                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs"
+                  className="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs transition-colors"
                 >
                   Cancelar
                 </button>
-                <button
-                  type="submit"
-                  disabled={!editProductName.trim() || (editBomItems.length === 0 && editFlavorSlots.length === 0)}
-                  className="flex-1 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20"
-                >
-                  ACTUALIZAR RECETA
-                </button>
+
+                <div className="flex items-center gap-2">
+                  {selectedProduct.recipeType !== 'base' && editRecipeActiveTab === 'bom' && (
+                    <button
+                      type="button"
+                      onClick={() => setEditRecipeActiveTab('options')}
+                      className="px-4 py-3 bg-cyan-600/30 hover:bg-cyan-600/40 text-cyan-300 border border-cyan-500/40 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                    >
+                      <span>Siguiente: Configurar Opciones POS</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {selectedProduct.recipeType !== 'base' && editRecipeActiveTab === 'options' && (
+                    <button
+                      type="button"
+                      onClick={() => setEditRecipeActiveTab('bom')}
+                      className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs flex items-center gap-1.5 transition-all"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Volver a Insumos BOM</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!editProductName.trim() || (editBomItems.length === 0 && editFlavorSlots.length === 0)}
+                    className="px-6 py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/25 active:scale-95 transition-all flex items-center gap-1.5"
+                  >
+                    <span>Actualizar Receta</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import type { Ingredient, MeasurementUnit, ItemType, IngredientCategory } from '../types';
+import { EmojiPicker, extractFirstEmoji } from './EmojiPicker';
 
 interface IngredientsModuleProps {
   onNavigateKardex?: () => void;
@@ -52,6 +53,7 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
   const [catFormUnit, setCatFormUnit] = useState<MeasurementUnit>('und');
   const [catFormQty, setCatFormQty] = useState<string>('1');
   const [catFormIsSlot, setCatFormIsSlot] = useState<boolean>(false);
+  const [showEmojiPickerFor, setShowEmojiPickerFor] = useState<'cat' | 'newIng' | null>(null);
 
   // Edición en línea de insumo (incluyendo reasignación de categoría)
   const [editStock, setEditStock] = useState<string>('');
@@ -800,20 +802,47 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                       ))}
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1">Emoji (Opcional)</label>
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-300">Emoji (Opcional)</label>
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPickerFor(prev => prev === 'newIng' ? null : 'newIng')}
+                        className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold"
+                      >
+                        {showEmojiPickerFor === 'newIng' ? 'Cerrar' : '✨ Elegir'}
+                      </button>
+                    </div>
                     <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPickerFor(prev => prev === 'newIng' ? null : 'newIng')}
+                        className="text-lg shrink-0 px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-xl cursor-pointer transition-colors"
+                        title="Abrir selector de emojis"
+                      >
+                        {newIcon.trim() || ingredientCategories.find(c => c.id === newCategory)?.icon || '📦'}
+                      </button>
                       <input
                         type="text"
-                        placeholder="Ej. 🍦"
+                        placeholder="Ej. 🍦 o pegar"
                         value={newIcon}
-                        onChange={e => setNewIcon(e.target.value)}
+                        onChange={e => setNewIcon(extractFirstEmoji(e.target.value, ''))}
                         className="w-full bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold text-center focus:outline-none"
                       />
-                      <span className="text-lg shrink-0 px-2 py-1 bg-slate-800 rounded-lg">
-                        {newIcon.trim() || ingredientCategories.find(c => c.id === newCategory)?.icon || '📦'}
-                      </span>
                     </div>
+                    {showEmojiPickerFor === 'newIng' && (
+                      <div className="absolute z-50 top-full right-0 mt-1 shadow-2xl animate-in fade-in zoom-in-95">
+                        <EmojiPicker
+                          value={newIcon}
+                          onSelect={(emoji) => {
+                            setNewIcon(emoji);
+                            setShowEmojiPickerFor(null);
+                          }}
+                          onClose={() => setShowEmojiPickerFor(null)}
+                          isLight={isLight}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -927,21 +956,52 @@ export const IngredientsModule: React.FC<IngredientsModuleProps> = ({ onNavigate
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Emoji / Ícono Identificador</label>
+              <div className="relative">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-slate-300">Emoji / Ícono Identificador</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPickerFor(prev => prev === 'cat' ? null : 'cat')}
+                    className="text-[11px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 transition-colors"
+                  >
+                    <span>{showEmojiPickerFor === 'cat' ? 'Cerrar selector' : '✨ Ver 150+ Emojis'}</span>
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl p-2 bg-slate-950 border border-slate-700 rounded-xl">{catFormIcon}</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPickerFor(prev => prev === 'cat' ? null : 'cat')}
+                    className="text-2xl p-2 bg-slate-950 hover:bg-slate-800 border border-slate-700 rounded-xl transition-all cursor-pointer shadow-sm"
+                    title="Click para abrir selector amplio de emojis"
+                  >
+                    {catFormIcon}
+                  </button>
                   <input
                     type="text"
                     value={catFormIcon}
-                    onChange={e => setCatFormIcon(e.target.value)}
-                    placeholder="Emoji o icono..."
+                    onChange={e => setCatFormIcon(extractFirstEmoji(e.target.value, catFormIcon))}
+                    placeholder="Pega o escribe cualquier emoji..."
                     className="flex-1 bg-slate-950 border border-slate-700 text-white rounded-xl p-2.5 text-xs font-bold focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
-                {/* Selector rápido de emojis */}
+
+                {showEmojiPickerFor === 'cat' && (
+                  <div className="absolute z-50 top-full left-0 mt-1 shadow-2xl animate-in fade-in zoom-in-95">
+                    <EmojiPicker
+                      value={catFormIcon}
+                      onSelect={(emoji) => {
+                        setCatFormIcon(emoji);
+                        setShowEmojiPickerFor(null);
+                      }}
+                      onClose={() => setShowEmojiPickerFor(null)}
+                      isLight={isLight}
+                    />
+                  </div>
+                )}
+
+                {/* Selector rápido directo de emojis frecuentes */}
                 <div className="flex flex-wrap gap-1.5 p-2 bg-slate-950/60 rounded-xl border border-slate-800">
-                  {['🍨', '🥖', '🍯', '🍓', '🥛', '🥩', '🌾', '☕', '🍫', '🧀', '🥑', '🥤', '🥪', '🧂', '📦', '🧼', '🏷️'].map(emoji => (
+                  {['🍨', '🥖', '🍯', '🍓', '🥛', '🥩', '🌾', '☕', '🍫', '🧀', '🥑', '🥤', '🥪', '🧂', '📦', '🧼', '🏷️', '🍍', '🍊', '🍕', '🍰'].map(emoji => (
                     <button
                       key={emoji}
                       type="button"
